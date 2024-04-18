@@ -22,7 +22,7 @@ class GradExtractorEncoderDecoder:
     def __init__(self, model: nn.Module, embeddings: nn.Embedding):
         self.model = model
         self.embeddings = embeddings
-        self.grad_storage = GradientStorage(self.embeddings)
+        self.grad_storage = GradientStorage(self.embeddings) # we want to store gradient wrt to the embeddings
 
     def highest_logprobs(self, inputs_embeds, attention_mask, labels):
         out = self.model(
@@ -50,23 +50,25 @@ class GradExtractorEncoderDecoder:
         return topk_out.values.sum(0)
 
     def grad_wrt_next_logprobs(self, batch):
+        # returns grad_input model(batch)
         inputs_embeds = self.embeddings(batch["input_ids"])
-        grad = func.grad(self.highest_logprobs)(
-            inputs_embeds,
-            attention_mask=batch["attention_mask"],
-            labels=batch["labels"],
+        grad = func.grad(self.highest_logprobs)( # highest_logprobs is a function, that we want to derive
+            inputs_embeds, # input of highest_logprobs
+            attention_mask=batch["attention_mask"], # input of highest_logprobs
+            labels=batch["labels"], # input of highest_logprobs
         )
         return grad
 
     def jacobian_wrt_next_topk_logprobs(self, batch, topk=10):
+        # returns J_model(batch)
         inputs_embeds = self.embeddings(batch["input_ids"])
         topk_func = partial(
-            self.topk_logprobs,
-            attention_mask=batch["attention_mask"],
-            labels=batch["labels"],
-            topk=topk,
-        )
-        compute_batch_jacobian = jacrev(topk_func)
+            self.topk_logprobs, # function to derive
+            attention_mask=batch["attention_mask"], # input
+            labels=batch["labels"], # input
+            topk=topk, # input
+        ) # gives a new function with partial application the inputs: attention_mask, labels and topk
+        compute_batch_jacobian = jacrev(topk_func) # function that returns the Jacobian of topk_func
         jacobian = compute_batch_jacobian(inputs_embeds)
 
         return jacobian
@@ -77,8 +79,8 @@ class GradExtractorEncoderDecoder:
             attention_mask=batch["attention_mask"],
             labels=batch["labels"],
         )
-        out.loss.backward()
-        grad = self.grad_storage.get_grad()
+        out.loss.backward() # compute gradient of the loss
+        grad = self.grad_storage.get_grad() # get the gradient wrt to the embeddings
         with torch.no_grad():
             gradient_dot_embeddings = einsum(
                 self.embeddings.weight, grad, "v h, b l h -> b v l"
@@ -94,8 +96,8 @@ if __name__ == "__main__":
     tokenizer = T5Tokenizer.from_pretrained("t5-base")
     model = T5ForConditionalGeneration.from_pretrained("t5-base")
 
-    input_str = "London is the capital of <extra_id_0>"
-    label_str = "<extra_id_0> France <extra_id_2>"
+    input_str = "London is the capital of <extra_id_0>."
+    label_str = "<extra_id_0> France <extra_id_1>"
 
     # Create input ids with some masks.
     batch = tokenizer(
@@ -108,7 +110,7 @@ if __name__ == "__main__":
         return_tensors="pt",
     )
     input_tokens = tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
-    print(input_tokens)
+    print("input:", input_tokens)
 
     # What the model should guess.
     # The answer corresponding to the input mask <extra_id_0> is "cute dog", the answer to <extra_id_1> is "the".
@@ -127,7 +129,7 @@ if __name__ == "__main__":
     labels_non_pad_token = labels_encoding["attention_mask"]
     batch["decoder_attention_mask"] = labels_encoding["attention_mask"]
 
-    print(tokenizer.convert_ids_to_tokens(batch["labels"][0]))
+    print("labels:", tokenizer.convert_ids_to_tokens(batch["labels"][0]))
 
     grad_extractor = GradExtractorEncoderDecoder(
         model=model, embeddings=model.encoder.embed_tokens
@@ -137,11 +139,22 @@ if __name__ == "__main__":
     batch = {k: v.to(DEVICE) for k, v in batch.items()}
 
     out, gradient_dot_embeddings = grad_extractor.forward_and_backward(batch)
+    print("gradient_dot_embeddings:", gradient_dot_embeddings.shape)
+
+    #print("out.shape:", out)
+    #print("out.generate:", out.generate())
+
     top_tokens_candidates = torch.topk(-gradient_dot_embeddings, 5, dim=1).indices
     for i in range(gradient_dot_embeddings.shape[-1]):
+        print(top_tokens_candidates[0, :, i].tolist())
         print(
             f"Top 5 replacements for {input_tokens[i]}: ",
             tokenizer.decode(
                 top_tokens_candidates[0, :, i].tolist(), skip_special_tokens=True
             ),
         )
+        print(gradient_dot_embeddings[:,:,i])
+
+    input_ids = tokenizer(input_str, return_tensors="pt").input_ids
+    outputs = model.generate(input_ids)
+    print(tokenizer.decode(outputs[0], skip_special_tokens=True))
