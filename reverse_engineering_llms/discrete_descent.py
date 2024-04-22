@@ -4,6 +4,7 @@ import torch
 from einops import einsum
 from torch import func, nn
 from torch.func import jacrev
+from tqdm import tqdm
 
 
 class GradientStorage:
@@ -84,14 +85,19 @@ class GradExtractorEncoderDecoder:
             )
         return out, gradient_dot_embeddings
 
-    def gradient_descent(self, input_str, label_str):
+    def discrete_descent(self, input_str, label_str, suffix_length, nb_steps):
         """
         computes the optimal tokens to write as a suffix of the user input to generate a given label (token that we want the model to predict)
 
         input_str: user input we should not modify
         label_str: token we aim to generate
         """
-        prompt_str = input_str + "<extra_id_2><extra_id_3><extra_id_4><extra_id_5><extra_id_6><extra_id_7><extra_id_8><extra_id_9><extra_id_10><extra_id_11>"
+        input_length = len(tokenizer([input_str],padding=True,truncation=True,max_length=512,return_tensors="pt",)["input_ids"][0])-1
+        print("input_length:", input_length)
+
+        prompt_str = input_str
+        for i in range(suffix_length):
+            prompt_str += "<extra_id_" + str(i) + ">"
 
         # input tokenization
         batch = tokenizer(
@@ -103,8 +109,8 @@ class GradExtractorEncoderDecoder:
             max_length=512,
             return_tensors="pt",
         )
-        input_tokens = tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
-        print("input:", input_tokens)
+        prompt_tokens = tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
+        print("input:", prompt_tokens)
 
         # label tokenization
         labels_encoding = tokenizer(
@@ -122,32 +128,31 @@ class GradExtractorEncoderDecoder:
         batch["labels"] = labels_encoding["input_ids"]
         batch["decoder_attention_mask"] = labels_encoding["attention_mask"]
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
-        #print("batch:", batch)
 
-        nb_steps = 1000
-        for step in range(nb_steps):
+        for step in tqdm(range(nb_steps)):
             out, gradient_dot_embeddings = self.forward_and_backward(batch)
             
-            top_tokens_values = torch.topk(-gradient_dot_embeddings, 5, dim=1).values
             top_tokens_candidates = torch.topk(-gradient_dot_embeddings, 5, dim=1).indices
-            #for i in range(gradient_dot_embeddings.shape[-1]):
-            for i in range(8,18):
+
+            for i in range(input_length,input_length+suffix_length):
                 best_token = top_tokens_candidates[0, :, i][0].item()
                 best_word = tokenizer.decode(best_token, skip_special_tokens=True)
 
-                #print("We want it replace:", input_tokens[i])
-                #print("best token:", best_token)
-                #print("best word:", best_word)
+                """
+                print("We want it replace:", prompt_tokens[i])
+                print("best token:", best_token, "which corresponds to", best_word)
+                """
 
                 # update
                 batch["input_ids"][0][i] = best_token
 
+            """
             if step%100==0:
                 print("prompt:", tokenizer.convert_ids_to_tokens(batch["input_ids"][0]))
+            """
 
         #print("batch[input_ids]:", batch["input_ids"])
-        return batch["input_ids"]
-
+        return batch["input_ids"], tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
 
 
 if __name__ == "__main__":
@@ -167,17 +172,17 @@ if __name__ == "__main__":
     # the forward function automatically creates the correct decoder_input_ids
     model.to(DEVICE)
 
-    new_input_ids = grad_extractor.gradient_descent(input_str, label_str)
-
+    suffix_length = 10
+    nb_steps = 10
+    opt_input_ids, opt_input_tokens = grad_extractor.discrete_descent(input_str, label_str, suffix_length, nb_steps)
+    print("Optimized prompt:", opt_input_tokens)
 
     # Generation test
-    print("\n--------Generate with input_ids--------")
+    print("\n--------Generated with the user input--------")
     input_ids = tokenizer(input_str, return_tensors="pt").input_ids
-    print("input_ids:", input_ids)
     outputs = model.generate(input_ids)
     print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 
-    print("\n--------Generate with new_input_ids--------")
-    print("new_input_ids:", new_input_ids)
-    new_outputs = model.generate(new_input_ids)
+    print("\n--------Generated with the optimized prompt--------")
+    new_outputs = model.generate(opt_input_ids)
     print(tokenizer.decode(new_outputs[0], skip_special_tokens=True))
