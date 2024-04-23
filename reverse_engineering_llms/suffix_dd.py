@@ -20,10 +20,9 @@ class GradientStorage:
 
 
 class GradExtractorEncoderDecoder:
-    def __init__(self, model: nn.Module, embeddings: nn.Embedding):
+    def __init__(self, model: nn.Module):
         self.model = model
-        self.embeddings = embeddings
-        self.grad_storage = GradientStorage(self.embeddings)
+        self.grad_storage = GradientStorage(model.suffix_embeddings)
 
     def highest_logprobs(self, inputs_embeds, attention_mask, labels):
         out = self.model(
@@ -79,6 +78,7 @@ class GradExtractorEncoderDecoder:
         )
         out.loss.backward()
         grad = self.grad_storage.get_grad()
+        print("gggrrad:", grad)
         with torch.no_grad():
             gradient_dot_embeddings = einsum(
                 self.embeddings.weight, grad, "v h, b l h -> b v l"
@@ -184,7 +184,12 @@ if __name__ == "__main__":
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
     tokenizer = T5Tokenizer.from_pretrained("t5-base")
-    model = T5ForConditionalGeneration.from_pretrained("t5-base")
+    
+    from suffixT5 import SuffixT5
+    model = SuffixT5(
+                nb_suffix = 5,
+                model = T5ForConditionalGeneration.from_pretrained("t5-base")
+            )
 
     """
     input_str = "London is the capital of <extra_id_0>."
@@ -196,9 +201,7 @@ if __name__ == "__main__":
     input_str = "London is the capital of <extra_id_0>."
     label_str = "<extra_id_0> France <extra_id_1>"
 
-    grad_extractor = GradExtractorEncoderDecoder(
-        model=model, embeddings=model.encoder.embed_tokens
-    )
+    grad_extractor = GradExtractorEncoderDecoder(model)
     # the forward function automatically creates the correct decoder_input_ids
     model.to(DEVICE)
 
