@@ -7,8 +7,6 @@ from torch.func import jacrev
 from tqdm import tqdm
 import torch.nn.functional as F
 
-from torch.nn import CrossEntropyLoss
-
 
 class GradientStorage:
     def __init__(self, module: nn.Module):
@@ -75,30 +73,14 @@ class GradExtractorEncoderDecoder:
         return jacobian
 
     def forward_and_backward(self, batch):
-        print("inputs_embeds",batch["inputs_embeds"].shape)
-        print("attention_mask",batch["attention_mask"].shape)
-        print("labels",batch["labels"].shape)
-
-        print("input_ids:", batch["input_ids"].shape)
         out = self.model(
             inputs_embeds=batch["inputs_embeds"],
             #input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
             labels=batch["labels"],
         )
-
-        labels=batch["labels"]
-        loss_fct = CrossEntropyLoss(ignore_index=-100)
-        # move labels to correct device to enable PP
-        labels = labels.to(out.logits.device)
-        print("labels:", labels)
-        loss = loss_fct(out.logits.view(-1, out.logits.size(-1)), labels.view(-1))
-        print("loss:", loss)
-
-
-        out.loss.backward()
+        out.loss.backward(retain_graph=True) # retain_graph=True to perform subsequent backward passes or access intermediate tensors as needed
         grad = self.grad_storage.get_grad()
-        print("grad:", grad.shape)
         with torch.no_grad():
             gradient_dot_embeddings = einsum(
                 self.embeddings.weight, grad, "v h, b l h -> b v l"
@@ -142,8 +124,7 @@ class GradExtractorEncoderDecoder:
             return_tensors="pt",
         )
         prompt_ids = batch["input_ids"]
-        batch["inputs_embeds"] = self.embeddings.weight[prompt_ids]
-        print("Initial prompt ids:", prompt_ids)
+        batch["inputs_embeds"] = self.embeddings(prompt_ids).clone() # self.embeddings.weight[prompt_ids] empeche le hook de prendre tous les embeddings
         prompt_tokens = tokenizer.convert_ids_to_tokens(prompt_ids[0])
         print("Initial prompt tokens:", prompt_tokens)
 
@@ -158,12 +139,8 @@ class GradExtractorEncoderDecoder:
             return_tensors="pt",
         )
         labels_ids = labels_encoding["input_ids"]
-        print("labels ids:", labels_ids)
         print("labels tokens:", tokenizer.convert_ids_to_tokens(labels_ids[0]))
         batch["labels"] = labels_encoding["input_ids"]
-        #print("labels_encoding[input_ids]:", labels_encoding["input_ids"].shape)
-        #batch["labels"] = self.embeddings.weight[labels_ids]
-        #print("batch[labels]:", batch["labels"].shape)
 
         batch["decoder_attention_mask"] = labels_encoding["attention_mask"]
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
@@ -171,23 +148,17 @@ class GradExtractorEncoderDecoder:
         for step in tqdm(range(nb_steps)):
             out, grad, gradient_dot_embeddings = self.forward_and_backward(batch)
 
-            print("batch[inputs_embeds][0][0]:", batch["inputs_embeds"][0][0].shape)
-            print("grad:", grad.shape)
-            print("grad[0, 0]:", grad[0, 0].shape)
-
             for i in range(input_length,input_length+suffix_length):
                 # grad.shape = [batch, prompt_length, embedding_size] = [1, 19, 768]
-                #prompt_embeddings[i] = prompt_embeddings[i] - lr*grad[0, i]
-                batch["inputs_embeds"][0][i] = batch["inputs_embeds"][0][i] - lr*grad[0, i] # only for first batch
-                
+                batch["inputs_embeds"] -= lr * grad[0, i]
 
         for i in range(input_length,input_length+suffix_length):
-            closest_emb, closest_id = self.closest_word(batch["inputs_embeds"][i])
-            batch["inputs_embeds"][i] = closest_emb
-            prompt_ids[i] = closest_id
+            closest_emb, closest_id = self.closest_word(batch["inputs_embeds"][0][i])
+            batch["inputs_embeds"][0][i] = closest_emb
+            prompt_ids[0][i] = closest_id
             
         #return batch["input_ids"], tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
-        return prompt_ids, tokenizer.convert_ids_to_tokens(prompt_ids)
+        return prompt_ids, tokenizer.convert_ids_to_tokens(prompt_ids[0])
 
 
 if __name__ == "__main__":
@@ -199,7 +170,7 @@ if __name__ == "__main__":
     model = T5ForConditionalGeneration.from_pretrained("t5-base")
 
     input_str = "London is the capital of <extra_id_0>."
-    label_str = "<extra_id_0> France OUI <extra_id_1>"
+    label_str = "<extra_id_0> France <extra_id_1>"
 
     grad_extractor = GradExtractorEncoderDecoder(
         model=model, embeddings=model.encoder.embed_tokens
@@ -208,8 +179,8 @@ if __name__ == "__main__":
     model.to(DEVICE)
 
     suffix_length = 10
-    nb_steps = 100
-    lr = 100
+    nb_steps = 200
+    lr = 0.1
     opt_input_ids, opt_input_tokens = grad_extractor.continuous_descent(input_str, label_str, suffix_length, nb_steps, lr)
     print("Optimized prompt:", opt_input_tokens)
 
