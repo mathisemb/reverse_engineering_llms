@@ -20,9 +20,10 @@ class GradientStorage:
 
 
 class GradExtractorEncoderDecoder:
-    def __init__(self, model: nn.Module):
+    def __init__(self, model: nn.Module, suffix_embeddings: nn.Embedding):
         self.model = model
-        self.grad_storage = GradientStorage(model.suffix_embeddings)
+        self.suffix_embeddings = suffix_embeddings
+        self.grad_storage = GradientStorage(self.suffix_embeddings)
 
     def highest_logprobs(self, inputs_embeds, attention_mask, labels):
         out = self.model(
@@ -79,9 +80,10 @@ class GradExtractorEncoderDecoder:
         out.loss.backward()
         grad = self.grad_storage.get_grad()
         print("gggrrad:", grad)
+        print("self.suffix_embeddings.weight:", self.model.suffix_embeddings.weight.shape)
         with torch.no_grad():
             gradient_dot_embeddings = einsum(
-                self.embeddings.weight, grad, "v h, b l h -> b v l"
+                self.model.suffix_embeddings.weight, grad, "v h, b l h -> b v l"
             )
         return out, gradient_dot_embeddings
 
@@ -201,7 +203,7 @@ if __name__ == "__main__":
     input_str = "London is the capital of <extra_id_0>."
     label_str = "<extra_id_0> France <extra_id_1>"
 
-    grad_extractor = GradExtractorEncoderDecoder(model)
+    grad_extractor = GradExtractorEncoderDecoder(model, model.suffix_embeddings)
     # the forward function automatically creates the correct decoder_input_ids
     model.to(DEVICE)
 

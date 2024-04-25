@@ -6,6 +6,7 @@ from torch import func, nn
 from torch.func import jacrev
 from tqdm import tqdm
 import torch.nn.functional as F
+#import matplotlib.pyplot as plt
 
 
 class GradientStorage:
@@ -87,6 +88,7 @@ class GradExtractorEncoderDecoder:
             )
         return out, grad, gradient_dot_embeddings
     
+    """
     def closest_word(self, embedding):
         # returns the embedding of an existing token that is the closest from the input embedding (projection from embedding space to embedding space of real words)
         closest_id = 0
@@ -99,6 +101,22 @@ class GradExtractorEncoderDecoder:
                 closest_emb = candidate
                 closest_id = id
         return closest_emb, closest_id
+    """
+    
+    def closest_word(self, embedding):
+        """
+        # cosine similarity
+        similarities = F.cosine_similarity(embedding.unsqueeze(0), self.embeddings.weight, dim=1)
+        closest_id = torch.argmax(similarities).item()
+        closest_emb = self.embeddings.weight[closest_id]
+        """
+
+        # dot product
+        dot_products = torch.einsum('i,ji->j', embedding, self.embeddings.weight)
+        closest_id = torch.argmax(dot_products).item()
+        closest_emb = self.embeddings.weight[closest_id]
+
+        return closest_emb, closest_id
 
     def continuous_descent(self, input_str, label_str, suffix_length, nb_steps, lr):
         """
@@ -109,24 +127,29 @@ class GradExtractorEncoderDecoder:
         """
         input_length = len(tokenizer([input_str],padding=True,truncation=True,max_length=512,return_tensors="pt",)["input_ids"][0])-1
 
+        """
         prompt_str = input_str
         for i in range(suffix_length):
-            prompt_str += "<extra_id_" + str(i) + ">"
+            prompt_str += ""
+        """
 
         # input tokenization
-        batch = tokenizer(
-            [
-                prompt_str,
-            ],
-            padding=True,
+        batch = tokenizer.encode(
+            input_str,
+            padding=False,
             truncation=True,
             max_length=512,
-            return_tensors="pt",
+            add_special_tokens = False
         )
-        prompt_ids = batch["input_ids"]
+        prompt_ids = torch.tensor([5]*suffix_length + batch + [tokenizer.eos_token_id]).unsqueeze(0)
+        prompt_ids = prompt_ids.to(DEVICE)
+        print("batch", batch)
+        batch = {"input_ids":prompt_ids,"attention_mask":torch.ones_like(prompt_ids, device=DEVICE)}
         batch["inputs_embeds"] = self.embeddings(prompt_ids).clone() # self.embeddings.weight[prompt_ids] empeche le hook de prendre tous les embeddings
         prompt_tokens = tokenizer.convert_ids_to_tokens(prompt_ids[0])
         print("Initial prompt tokens:", prompt_tokens)
+
+        print(self.embeddings)
 
         # label tokenization
         labels_encoding = tokenizer(
@@ -145,20 +168,28 @@ class GradExtractorEncoderDecoder:
         batch["decoder_attention_mask"] = labels_encoding["attention_mask"]
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
 
+        gradient_norms = []
+
         for step in tqdm(range(nb_steps)):
             out, grad, gradient_dot_embeddings = self.forward_and_backward(batch)
+
+            gradient_norms.append(torch.norm(grad, p=2))
 
             for i in range(input_length,input_length+suffix_length):
                 # grad.shape = [batch, prompt_length, embedding_size] = [1, 19, 768]
                 batch["inputs_embeds"] -= lr * grad[0, i]
 
-        for i in range(input_length,input_length+suffix_length):
+        #for i in range(input_length,input_length+suffix_length):
+        for i in range(suffix_length):
             closest_emb, closest_id = self.closest_word(batch["inputs_embeds"][0][i])
             batch["inputs_embeds"][0][i] = closest_emb
             prompt_ids[0][i] = closest_id
+
+        print("prompt_ids[0]", prompt_ids[0])
+        
             
         #return batch["input_ids"], tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
-        return prompt_ids, tokenizer.convert_ids_to_tokens(prompt_ids[0])
+        return prompt_ids, tokenizer.convert_ids_to_tokens(prompt_ids[0]), gradient_norms
 
 
 if __name__ == "__main__":
@@ -168,6 +199,7 @@ if __name__ == "__main__":
 
     tokenizer = T5Tokenizer.from_pretrained("t5-base")
     model = T5ForConditionalGeneration.from_pretrained("t5-base")
+    model.resize_token_embeddings(len(tokenizer))
 
     input_str = "London is the capital of <extra_id_0>."
     label_str = "<extra_id_0> France <extra_id_1>"
@@ -179,17 +211,20 @@ if __name__ == "__main__":
     model.to(DEVICE)
 
     suffix_length = 10
-    nb_steps = 200
-    lr = 0.1
-    opt_input_ids, opt_input_tokens = grad_extractor.continuous_descent(input_str, label_str, suffix_length, nb_steps, lr)
+    nb_steps = 10000
+    lr = 10
+    opt_input_ids, opt_input_tokens, gradient_norms = grad_extractor.continuous_descent(input_str, label_str, suffix_length, nb_steps, lr)
     print("Optimized prompt:", opt_input_tokens)
+
+    #plt.plot(gradient_norms)
+    #plt.show()
 
     # Generation test
     print("\n--------Generated with the user input--------")
     input_ids = tokenizer(input_str, return_tensors="pt").input_ids
-    outputs = model.generate(input_ids)
+    outputs = model.generate(input_ids.to(DEVICE))
     print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     print("\n--------Generated with the optimized prompt--------")
-    new_outputs = model.generate(opt_input_ids)
+    new_outputs = model.generate(opt_input_ids.to(DEVICE))
     print(tokenizer.decode(new_outputs[0], skip_special_tokens=True))
