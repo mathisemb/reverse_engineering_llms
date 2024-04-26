@@ -211,8 +211,8 @@ if __name__ == "__main__":
     model.to(DEVICE)
 
     suffix_length = 10
-    nb_steps = 10000
-    lr = 10
+    nb_steps = 1000
+    lr = 10000
     opt_input_ids, opt_input_tokens, gradient_norms = grad_extractor.continuous_descent(input_str, label_str, suffix_length, nb_steps, lr)
     print("Optimized prompt:", opt_input_tokens)
 

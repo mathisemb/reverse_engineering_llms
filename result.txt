@@ -27,3 +27,64 @@ the United Kingdom the United Kingdom the United Kingdom the United Kingdom the 
 --------Generated with the optimized prompt--------
 the United Kingdom. England England England... the United Kingdom
 (venv) membit@coktailjet:~/projects/reverse/reverse_engineering_llms$
+
+
+Params:
+suffix_length = 10
+nb_steps = 10000
+lr = 1000
+
+Result:
+(venv) membit@coktailjet:~/projects/reverse/reverse_engineering_llms$ python3 continuous_descent.py
+You are using the default legacy behaviour of the <class 'transformers.models.t5.tokenization_t5.T5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+batch [1524, 19, 8, 1784, 13, 32099, 3, 5]
+Initial prompt tokens: ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '▁London', '▁is', '▁the', '▁capital', '▁of', '<extra_id_0>', '▁', '.', '</s>']
+Embedding(32100, 768)
+/home/lamsade/membit/projects/reverse/venv/lib/python3.11/site-packages/transformers/tokenization_utils_base.py:2692: UserWarning: `max_length` is ignored when `padding`=`True` and there is no truncation strategy. To pad to max length, use `padding='max_length'`.
+  warnings.warn(
+labels tokens: ['<extra_id_0>', '▁France', '<extra_id_1>']
+100%|████████████████████████████████████████████████| 10000/10000 [45:15<00:00,  3.68it/s]
+prompt_ids[0] tensor([    5,     5,     5,     5,     5,     5,     5,     5,     5,     5,
+         1524,    19,     8,  1784,    13, 32099,     3,     5,     1],
+       device='cuda:0')
+Optimized prompt: ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '▁London', '▁is', '▁the', '▁capital', '▁of', '<extra_id_0>', '▁', '.', '</s>']
+
+--------Generated with the user input--------
+/home/lamsade/membit/projects/reverse/venv/lib/python3.11/site-packages/transformers/generation/utils.py:1141: UserWarning: Using the model-agnostic default `max_length` (=20) to control the generation length. We recommend setting `max_new_tokens` to control the maximum length of the generation.
+  warnings.warn(
+the United Kingdom the United Kingdom the United Kingdom the United Kingdom the United
+
+--------Generated with the optimized prompt--------
+the United Kingdom. England England England... the United Kingdom
+
+
+Params:
+suffix_length = 10
+nb_steps = 1000
+lr = 10000
+
+Result:
+(venv) membit@coktailjet:~/projects/reverse/reverse_engineering_llms$ python3 continuous_descent.py
+You are using the default legacy behaviour of the <class 'transformers.models.t5.tokenization_t5.T5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+batch [1524, 19, 8, 1784, 13, 32099, 3, 5]
+Initial prompt tokens: ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '▁London', '▁is', '▁the', '▁capital', '▁of', '<extra_id_0>', '▁', '.', '</s>']
+Embedding(32100, 768)
+/home/lamsade/membit/projects/reverse/venv/lib/python3.11/site-packages/transformers/tokenization_utils_base.py:2692: UserWarning: `max_length` is ignored when `padding`=`True` and there is no truncation strategy. To pad to max length, use `padding='max_length'`.
+  warnings.warn(
+labels tokens: ['<extra_id_0>', '▁France', '<extra_id_1>']
+100%|██████████████████████████████████████████████████| 1000/1000 [01:17<00:00, 12.93it/s]
+prompt_ids[0] tensor([ 1410,  1410,  1410,  1410,  1410,  1410,  1410,  1410,  1410,  1410,
+         1524,    19,     8,  1784,    13, 32099,     3,     5,     1],
+       device='cuda:0')
+Optimized prompt: ['▁France', '▁France', '▁France', '▁France', '▁France', '▁France', '▁France', '▁France', '▁France', '▁France', '▁London', '▁is', '▁the', '▁capital', '▁of', '<extra_id_0>', '▁', '.', '</s>']
+
+--------Generated with the user input--------
+/home/lamsade/membit/projects/reverse/venv/lib/python3.11/site-packages/transformers/generation/utils.py:1141: UserWarning: Using the model-agnostic default `max_length` (=20) to control the generation length. We recommend setting `max_new_tokens` to control the maximum length of the generation.
+  warnings.warn(
+the United Kingdom the United Kingdom the United Kingdom the United Kingdom the United
+
+--------Generated with the optimized prompt--------
+England England England England England. London is the capital of England
+(venv) membit@coktailjet:~/projects/reverse/reverse_engineering_llms$
