@@ -11,11 +11,11 @@ def word_std_wrt_dimension(matrix):
 def word_norm(matrix):
     # matrix is a V x D matrix where V is the vocab size and D the embedding size
     # returns a vector of size D containing the L2 norm of the words for each embedding dimension
-    return torch.norm(matrix, p=2, dim=0)
+    return torch.norm(matrix, p=2, dim=1)
 
 def distance_between_words(matrix):
     # matrix is a V x D matrix where V is the vocab size and D the embedding size
-    # returns a vector of size V containing the L2 distance of each words from each word
+    # returns a vector of size V containing the averaged L2 distance of each words from each word
     MMT = torch.matmul(matrix, matrix.t())
     word_norms = MMT.diag()
     TrMMT = word_norms.sum()
@@ -42,6 +42,7 @@ if __name__ == "__main__":
     print("embed_matrix", embed_matrix.shape) # shpae = V x D
 
     stds = word_std_wrt_dimension(embed_matrix)
+    print("mean stds", torch.mean(stds))
     plot_array(array = stds.detach().numpy(),
                sort = True,
                title = "Standard deviation of embedding dimensions",
@@ -49,6 +50,7 @@ if __name__ == "__main__":
                ylabel = "Standard Deviation")
 
     norms = word_norm(embed_matrix)
+    print("mean norms", torch.mean(norms))
     plot_array(array = norms.detach().numpy(),
                sort = True,
                title = "Norm of each word",
@@ -56,6 +58,7 @@ if __name__ == "__main__":
                ylabel = "Norms")
 
     avg_distances = distance_between_words(embed_matrix)
+    print("mean avg_distances", torch.mean(avg_distances))
     plot_array(array = avg_distances.detach().numpy(),
                sort = True,
                title = "Average distance of each word to each word",

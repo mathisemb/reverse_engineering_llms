@@ -5,7 +5,7 @@ from einops import einsum
 from torch import func, nn
 from torch.func import jacrev
 from tqdm import tqdm
-
+#import matplotlib.pyplot as plt
 
 class GradientStorage:
     def __init__(self, module: nn.Module):
@@ -79,11 +79,15 @@ class GradExtractorEncoderDecoder:
         )
         out.loss.backward()
         grad = self.grad_storage.get_grad()
+        #print("grad", grad)
+        #print("grad normed ", grad / grad.norm(dim=-1, keepdim=True))
+        #grad = grad / grad.norm(dim=-1, keepdim=True)
+        #print("grad shape", grad.shape)
         with torch.no_grad():
             gradient_dot_embeddings = einsum(
                 self.embeddings.weight, grad, "v h, b l h -> b v l"
             )
-        return out, gradient_dot_embeddings
+        return out, gradient_dot_embeddings, grad
 
     def discrete_descent(self, input_str, label_str, suffix_length, nb_steps, k=5, approximation=False):
         """
@@ -95,9 +99,10 @@ class GradExtractorEncoderDecoder:
         input_length = len(tokenizer([input_str],padding=True,truncation=True,max_length=512,return_tensors="pt",)["input_ids"][0])-1
         print("input_length:", input_length)
 
-        prompt_str = input_str
+        prompt_str = ""
         for i in range(suffix_length):
             prompt_str += "<extra_id_" + str(i) + ">"
+        prompt_str += input_str
 
         # input tokenization
         batch = tokenizer(
@@ -129,12 +134,17 @@ class GradExtractorEncoderDecoder:
         batch["decoder_attention_mask"] = labels_encoding["attention_mask"]
         batch = {k: v.to(DEVICE) for k, v in batch.items()}
 
+        gradient_norms = []
+
         for step in tqdm(range(nb_steps)):
-            out, gradient_dot_embeddings = self.forward_and_backward(batch)
+            out, gradient_dot_embeddings, grad = self.forward_and_backward(batch)
+
+            gradient_norms.append(torch.norm(grad, p=2))
             
             top_tokens_candidates = torch.topk(-gradient_dot_embeddings, k, dim=1).indices
 
-            for i in range(input_length,input_length+suffix_length):
+            #for i in range(input_length,input_length+suffix_length):
+            for i in range(suffix_length):
 
                 if approximation:
                     best_token = top_tokens_candidates[0, 0, i].item() # le premier car meilleure approximation
@@ -175,7 +185,7 @@ class GradExtractorEncoderDecoder:
             """
 
         #print("batch[input_ids]:", batch["input_ids"])
-        return batch["input_ids"], tokenizer.convert_ids_to_tokens(batch["input_ids"][0])
+        return batch["input_ids"], tokenizer.convert_ids_to_tokens(batch["input_ids"][0]), gradient_norms
 
 
 if __name__ == "__main__":
@@ -193,8 +203,8 @@ if __name__ == "__main__":
     input_str = "United <extra_id_0>"
     label_str = "<extra_id_0> Kingdom"
     """
-    input_str = "London is the capital of <extra_id_0>."
-    label_str = "<extra_id_0> France <extra_id_1>"
+    input_str = "London is the capital of <extra_id_0>"
+    label_str = "<extra_id_0> France"
 
     grad_extractor = GradExtractorEncoderDecoder(
         model=model, embeddings=model.encoder.embed_tokens
@@ -202,18 +212,21 @@ if __name__ == "__main__":
     # the forward function automatically creates the correct decoder_input_ids
     model.to(DEVICE)
 
-    suffix_length = 3
+    suffix_length = 6
     nb_steps = 100
     k = 3
-    opt_input_ids, opt_input_tokens = grad_extractor.discrete_descent(input_str, label_str, suffix_length, nb_steps, k, approximation=True)
+    opt_input_ids, opt_input_tokens, gradient_norms = grad_extractor.discrete_descent(input_str, label_str, suffix_length, nb_steps, k, approximation=False)
     print("Optimized prompt:", opt_input_tokens)
+
+    #plt.plot(gradient_norms)
+    #plt.show()
 
     # Generation test
     print("\n--------Generated with the user input--------")
     input_ids = tokenizer(input_str, return_tensors="pt").input_ids
-    outputs = model.generate(input_ids)
+    outputs = model.generate(input_ids.to(DEVICE))
     print(tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     print("\n--------Generated with the optimized prompt--------")
-    new_outputs = model.generate(opt_input_ids)
+    new_outputs = model.generate(opt_input_ids.to(DEVICE))
     print(tokenizer.decode(new_outputs[0], skip_special_tokens=True))
