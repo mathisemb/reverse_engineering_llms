@@ -177,13 +177,13 @@ if __name__ == "__main__":
     from transformers import T5ForConditionalGeneration, T5Tokenizer
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
+    
     tokenizer = T5Tokenizer.from_pretrained("t5-base")
     model = T5ForConditionalGeneration.from_pretrained("t5-base")
     model.resize_token_embeddings(len(tokenizer))
 
-    input_str = "London is the capital of <extra_id_0>."
-    label_str = "<extra_id_0> France <extra_id_1>"
+    input_str = "London is the capital of <extra_id_0>"
+    label_str = "<extra_id_0> France"
 
     grad_extractor = GradExtractorEncoderDecoder(
         model=model, embeddings=model.encoder.embed_tokens
@@ -191,8 +191,8 @@ if __name__ == "__main__":
     # the forward function automatically creates the correct decoder_input_ids
     model.to(DEVICE)
 
-    suffix_length = 20
-    nb_steps = 1000
+    suffix_length = 10
+    nb_steps = 100
     lr = 10
     opt_input_ids, opt_input_tokens, batch, gradient_norms = grad_extractor.continuous_descent(input_str, label_str, suffix_length, nb_steps, lr)
     print("Optimized prompt:", opt_input_tokens)
@@ -204,14 +204,13 @@ if __name__ == "__main__":
     print("\n--------Generated with the user input--------")
     input_ids = tokenizer(input_str, return_tensors="pt").input_ids
     outputs = model.generate(input_ids.to(DEVICE))
-    print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+    print("model(user input):", tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     print("\n--------Generated with the optimized prompt--------")
     new_outputs = model.generate(opt_input_ids.to(DEVICE))
-    print("newoutput",new_outputs[0] )
-    print(tokenizer.decode(new_outputs[0], skip_special_tokens=True))
+    print("model(closest tokens from opt embeddings):", tokenizer.decode(new_outputs[0], skip_special_tokens=True))
 
-    # with embeddings as inputs
+    # --- with embeddings as inputs ---
     #import ipdb
     #ipdb.set_trace()
     out = model(
@@ -219,6 +218,16 @@ if __name__ == "__main__":
         attention_mask=batch["attention_mask"],
         labels=batch["labels"],
     )
-    print("out.logits", out.logits.shape)
+    #print("out.logits", out.logits.shape)
     argmax_output_token = torch.tensor([torch.argmax(out.logits[0,1]).item()])
-    print("output from embedding:", tokenizer.decode(argmax_output_token, skip_special_tokens=True))
+    print("model(opt embeddings):", tokenizer.decode(argmax_output_token, skip_special_tokens=True))
+
+    # --- with embeddings as inputs and CHANGING THE USER INPUT ---
+    out = model(
+        inputs_embeds=batch["inputs_embeds"],
+        attention_mask=batch["attention_mask"],
+        labels=batch["labels"],
+    )
+    #print("out.logits", out.logits.shape)
+    argmax_output_token = torch.tensor([torch.argmax(out.logits[0,1]).item()])
+    print("model(opt embeddings):", tokenizer.decode(argmax_output_token, skip_special_tokens=True))

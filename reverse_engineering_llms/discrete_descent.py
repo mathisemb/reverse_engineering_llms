@@ -212,7 +212,7 @@ if __name__ == "__main__":
     # the forward function automatically creates the correct decoder_input_ids
     model.to(DEVICE)
 
-    suffix_length = 6
+    suffix_length = 20
     nb_steps = 100
     k = 3
     opt_input_ids, opt_input_tokens, gradient_norms = grad_extractor.discrete_descent(input_str, label_str, suffix_length, nb_steps, k, approximation=False)
@@ -225,8 +225,41 @@ if __name__ == "__main__":
     print("\n--------Generated with the user input--------")
     input_ids = tokenizer(input_str, return_tensors="pt").input_ids
     outputs = model.generate(input_ids.to(DEVICE))
-    print(tokenizer.decode(outputs[0], skip_special_tokens=True))
+    print("model(opt embeddings):", tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     print("\n--------Generated with the optimized prompt--------")
     new_outputs = model.generate(opt_input_ids.to(DEVICE))
-    print(tokenizer.decode(new_outputs[0], skip_special_tokens=True))
+    print("model(opt tokens):", tokenizer.decode(new_outputs[0], skip_special_tokens=True))
+
+    # Test with other cities
+    """
+    print("opt_input_ids", opt_input_ids)
+    print("opt_input_ids", opt_input_ids[0,suffix_length].item())
+    madrid = tokenizer(
+        [
+            "Madrid",
+        ],
+        padding=True,
+        truncation=True,
+        max_length=512,
+        return_tensors="pt",
+    )
+    madrid_id = madrid['input_ids'][0,0].item()
+    print("madrid:", madrid_id)
+    print("madrid?", tokenizer.convert_ids_to_tokens(madrid_id))
+    """
+
+    cities = ["Madrid", "Luxembourg", "Berlin", "Bruxelle", "Amsterdam", "Lisbonne"]
+    for city in cities:
+        city_id = tokenizer(
+                    [
+                        city,
+                    ],
+                    padding=True,
+                    truncation=True,
+                    max_length=512,
+                    return_tensors="pt",
+                )['input_ids'][0,0].item()
+        opt_input_ids[0,suffix_length] = city_id
+        new_outputs = model.generate(opt_input_ids.to(DEVICE))
+        print("model(opt tokens + " + city + "):", tokenizer.decode(new_outputs[0], skip_special_tokens=True))
