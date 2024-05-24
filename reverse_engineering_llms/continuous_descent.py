@@ -74,6 +74,10 @@ class GradExtractorEncoderDecoder:
         return jacobian
 
     def forward_and_backward(self, batch):
+        print("==========input_ids==========")
+        print(batch["input_ids"])
+        print("==========labels==========")
+        print(batch["labels"])
         out = self.model(
             inputs_embeds=batch["inputs_embeds"],
             #input_ids=batch["input_ids"],
