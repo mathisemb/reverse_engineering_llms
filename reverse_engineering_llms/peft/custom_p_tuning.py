@@ -29,7 +29,7 @@ model.print_trainable_parameters()
 # can also be done with the Transformers Trainer class
 # https://huggingface.co/transformers/main_classes/trainer.html
 lr = 3e-2
-num_epochs = 10
+num_epochs = 100
 #optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -50,7 +50,16 @@ for epoch in tqdm(range(num_epochs)):
     optimizer.step()
     optimizer.zero_grad()
 
-#print("Optimized prompt:", model.get_prompt())
+
+# OPTIMIZED PROMPT
+prompt_embeddings = model.get_prompt(batch_size=1)
+print("prompt_embeddings:", prompt_embeddings.shape) # [batch_size, num_tokens, embedding_dim] = [1, 20, 1024]
+embedding_matrix = model.get_input_embeddings().weight.data
+print("embedding_matrix:", embedding_matrix.shape) # [vocab_size, embedding_dim]
+nearest_tokens = torch.argmax(torch.matmul(prompt_embeddings, embedding_matrix.T), dim=-1) # Find the nearest tokens in the embedding space
+decoded_prompt = tokenizer.decode(nearest_tokens[0], skip_special_tokens=True)
+print("decoded_prompt:", decoded_prompt)
+
 
 # INFERENCE TEST
 input = "London is the capital of"
