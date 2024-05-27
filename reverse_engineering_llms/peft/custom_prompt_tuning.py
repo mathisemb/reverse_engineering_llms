@@ -60,7 +60,21 @@ def compute_likelihood(embeddings_sentence):
     return sentence_likelihood
 """
 
+def mean_distance_to_embedding_matrix(model):
+    # returns the mean of cosine sim between each embeddings and their closest (cosine) embedding in the embedding matrix
+    prompt_embeddings = model.get_prompt(batch_size=1)[0] # [nb_embeddings, embedding_dim]
+    embedding_matrix = model.get_input_embeddings().weight # [vocab_size, embedding_dim]
+    dot_product = torch.matmul(prompt_embeddings, embedding_matrix.T)
+    denom = torch.matmul(torch.norm(prompt_embeddings, dim=-1, keepdim=True), torch.norm(embedding_matrix, dim=-1, keepdim=True).T)
+    cosine_sim = dot_product/denom
+    one_minus_cosine_sim = torch.ones_like(cosine_sim) - cosine_sim
+    mins = torch.min(one_minus_cosine_sim, dim=-1).values
+    return mins.mean().item()
+
 def training(input, label, num_epochs, alpha=1, beta=1, use_likelihood=True, use_entropy=True):
+    # before training
+    print("mean_distance_to_embedding_matrix BEFORE:", mean_distance_to_embedding_matrix(model))
+
     for epoch in tqdm(range(num_epochs)):
         model.train()
         total_loss = 0
@@ -90,10 +104,14 @@ def training(input, label, num_epochs, alpha=1, beta=1, use_likelihood=True, use
             total_loss += beta*entropy
 
         total_loss.backward() # backward on the total loss
+        #loss.backward() # backward on the original loss
         optimizer.step()
         optimizer.zero_grad()
+    
+    # after training
+    print("mean_distance_to_embedding_matrix AFTER:", mean_distance_to_embedding_matrix(model))
 
-training(input, label, num_epochs, beta=10)
+training(input, label, num_epochs, beta=10, use_likelihood=False, use_entropy=True)
 
 
 # OPTIMIZED PROMPT
