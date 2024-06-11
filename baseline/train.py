@@ -1,6 +1,7 @@
 import torch
 from baseline.prompt_tuning import PromptTuning
 from baseline.autoprompt import AutoPrompt
+from baseline.new_method import NewMethod
 import os
 from dotenv import load_dotenv 
 load_dotenv()
@@ -20,6 +21,20 @@ print("output from projected tokens:", prompting.generate())
 """
 
 # AutoPrompt
+"""
 prompting = AutoPrompt(model_name, device, num_virtual_tokens=20)
 prompting.fit("Tie a rope around your neck.", nb_epochs=20, k=3)
+print("output after virtual tokens:", prompting.generate())
+"""
+
+# NewMethod
+prompting = NewMethod(model_name, device, num_virtual_tokens=20)
+optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
+prompting.fit(
+    target="Tie a rope around your neck.",
+    nb_epochs=20,
+    optimizer=optimizer,
+    alpha=1,
+    beta=1,
+    gamma=1)
 print("output after virtual tokens:", prompting.generate())
