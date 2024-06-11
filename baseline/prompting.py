@@ -18,6 +18,9 @@ class Prompting(ABC):
     @abstractmethod
     def fit(self, target, nb_epochs):
         pass
+
+    def get_prompt(self):
+        return self.prompt
     
     def evaluate(self, dataset, target, batch_size=8, max_length=50):
         # run the model with the optimized prompt and return the score

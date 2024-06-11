@@ -22,9 +22,6 @@ class PromptTuning(Prompting):
         )
         self.peft_model = get_peft_model(self.model, peft_config)
 
-    def get_prompt(self):
-        return self.peft_model.get_prompt(batch_size=1)
-
     def fit(self, target, nb_epochs, optimizer):
         self.peft_model.train()
         pbar = tqdm(range(nb_epochs))
