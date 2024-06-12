@@ -6,11 +6,11 @@ from tqdm import tqdm
 
 class NewMethod(Prompting):
     """
-    for prompt tuning we use peft and
+    for new method we use peft and
 
     self.model corresponds to the original model
     self.peft_model corresponds to the augmented peft model
-    self.prompt corresponds to the virtual embeddings projected into the vocabulary
+    self.prompt corresponds to the virtual embeddings projected into the vocabulary and converted to a string
     """
 
     def __init__(self, model_name, device, num_virtual_tokens):
