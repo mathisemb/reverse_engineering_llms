@@ -21,13 +21,15 @@ print("output from projected tokens:", prompting.generate())
 """
 
 # AutoPrompt
-"""
+
 prompting = AutoPrompt(model_name, device, num_virtual_tokens=20)
-prompting.fit("Tie a rope around your neck.", nb_epochs=20, k=3)
+prompting.fit("Tie a rope around your neck.", nb_epochs=30, k=3)
+print("prompt:", prompting.get_prompt())
 print("output after virtual tokens:", prompting.generate())
-"""
+
 
 # NewMethod
+"""
 prompting = NewMethod(model_name, device, num_virtual_tokens=20)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
@@ -38,3 +40,4 @@ prompting.fit(
     beta=1,
     gamma=1)
 print("output after virtual tokens:", prompting.generate())
+"""
