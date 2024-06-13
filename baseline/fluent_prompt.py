@@ -52,7 +52,7 @@ class FluentPrompt(Prompting):
         log_likelihood = torch.sum(torch.log(cond_prob), dim=-1)
         return log_likelihood # [batch_size]
 
-    def fit(self, target, nb_epochs, optimizer, alpha=1, beta=1, gamma=1):
+    def fit(self, target, nb_epochs, optimizer, l_task=0.5, l_fluency=0.5):
         self.peft_model.train()
 
         # beta is the variance of the noise following a geometric progression
@@ -63,52 +63,41 @@ class FluentPrompt(Prompting):
         for epoch in pbar:
             optimizer.zero_grad()
 
-            # loss step
             target_tok = self.tokenizer(target, return_tensors='pt')
             target_ids = target_tok['input_ids'].to(self.device)
             attention_mask = target_tok['attention_mask'].to(self.device)
+
+            # original loss
             outputs = self.peft_model(input_ids=target_ids, attention_mask=attention_mask, labels=target_ids)
             loss = outputs.loss
 
-            loss.backward() # backward on the total loss
+            # likelihood loss
+            prompt_embeddings = self.peft_model.get_prompt(batch_size=1)
+            likelihood_loss = -self.log_likelihood(prompt_embeddings)[0]
+
+            total_loss = l_task*loss + l_fluency*likelihood_loss
+            total_loss.backward() # backward on the total loss
             optimizer.step()
 
-            # now we add noise
-
-            #print("self.peft_model.get_prompt(batch_size=1)", self.peft_model.get_prompt(batch_size=1))
-
             # we now add noise: sqrt(2.eta.beta_i) * N(0, 1) to the prompt embeddings
-            prompt_tokens = self.peft_model.prompt_tokens['default'].to(self.device)
+            prompt_embeddings = self.peft_model.get_prompt(batch_size=1) # has been updated by the optimizer
             eta = optimizer.param_groups[0]['lr']
-            prompt_embeddings = self.peft_model.get_prompt(batch_size=1)
             noise = torch.sqrt(2*eta*betas[epoch]) * torch.randn_like(prompt_embeddings[0]) # [num_virtual_tokens, embedding_dim] (eliminate batch dimension)
             
-            #self.peft_model.prompt_encoder['default'].embedding.weight[prompt_tokens] += noise
+            #self.peft_model.prompt_encoder['default'].embedding.weight[prompt_tokens] += noise # does not work because of the gradient
             weight = self.peft_model.prompt_encoder['default'].embedding.weight.clone()
+            prompt_tokens = self.peft_model.prompt_tokens['default'].to(self.device)
             weight[prompt_tokens] += noise
 
-            #print("weight[prompt_tokens].shape", weight[prompt_tokens].shape) # [20, 4096]
-
             # now we project
-
             prompt_embeddings = self.peft_model.get_prompt(batch_size=1)[0] # [20, 4096]
             embedding_matrix = self.peft_model.get_input_embeddings().weight.data # [vocab_size, embedding_dim]
             nearest_tokens = torch.argmax(torch.matmul(prompt_embeddings, embedding_matrix.T), dim=-1) # Find the nearest tokens in the embedding space
-
-            #print("prompt_embeddings", prompt_embeddings.shape) # [20, 4096]
-            #print("nearest_tokens", nearest_tokens.shape) # [20]
 
             for i in range(len(prompt_tokens)):
                 weight[prompt_tokens[i]] = embedding_matrix[nearest_tokens[i]]
 
             self.peft_model.prompt_encoder['default'].embedding.weight = torch.nn.Parameter(weight)
-
-            """ see later    
-            likelihood_loss = -self.log_likelihood(self.peft_model.get_prompt(batch_size=1))[0]
-            total_loss = alpha*loss + gamma*likelihood_loss
-            total_loss.backward() # backward on the total loss
-            optimizer.step()
-            """
         
         prompt_embeddings = self.peft_model.get_prompt(batch_size=1)
         embedding_matrix = self.peft_model.get_input_embeddings().weight.data

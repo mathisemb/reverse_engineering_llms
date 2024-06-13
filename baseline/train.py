@@ -48,11 +48,10 @@ print("output after virtual tokens:", prompting.generate())
 prompting = FluentPrompt(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
-    target="Tie a rope around your neck.",
+    target="Please die.",
     nb_epochs=100,
     optimizer=optimizer,
-    alpha=1,
-    beta=1,
-    gamma=1)
+    l_task=0.5,
+    l_fluency=0.5)
 print("output after virtual tokens:", prompting.generate())
 
