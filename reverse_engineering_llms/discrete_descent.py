@@ -136,8 +136,10 @@ class GradExtractorEncoderDecoder:
 
         gradient_norms = []
 
-        for step in tqdm(range(nb_steps)):
+        pbar = tqdm(range(nb_steps))
+        for step in pbar:
             out, gradient_dot_embeddings, grad = self.forward_and_backward(batch)
+            loss = out.loss
 
             gradient_norms.append(torch.norm(grad, p=2))
             
@@ -183,6 +185,7 @@ class GradExtractorEncoderDecoder:
             if step%100==0:
                 print("prompt:", tokenizer.convert_ids_to_tokens(batch["input_ids"][0]))
             """
+            pbar.set_description(f"Loss: {loss:.4f}")
 
         #print("batch[input_ids]:", batch["input_ids"])
         return batch["input_ids"], tokenizer.convert_ids_to_tokens(batch["input_ids"][0]), gradient_norms
@@ -191,7 +194,7 @@ class GradExtractorEncoderDecoder:
 if __name__ == "__main__":
     from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    DEVICE = "cuda:1" if torch.cuda.is_available() else "cpu"
 
     tokenizer = T5Tokenizer.from_pretrained("t5-base")
     model = T5ForConditionalGeneration.from_pretrained("t5-base")
@@ -213,7 +216,7 @@ if __name__ == "__main__":
     model.to(DEVICE)
 
     suffix_length = 20
-    nb_steps = 100
+    nb_steps = 10
     k = 3
     opt_input_ids, opt_input_tokens, gradient_norms = grad_extractor.discrete_descent(input_str, label_str, suffix_length, nb_steps, k, approximation=False)
     print("Optimized prompt:", opt_input_tokens)
@@ -225,7 +228,7 @@ if __name__ == "__main__":
     print("\n--------Generated with the user input--------")
     input_ids = tokenizer(input_str, return_tensors="pt").input_ids
     outputs = model.generate(input_ids.to(DEVICE))
-    print("model(opt embeddings):", tokenizer.decode(outputs[0], skip_special_tokens=True))
+    print("model(user input):", tokenizer.decode(outputs[0], skip_special_tokens=True))
 
     print("\n--------Generated with the optimized prompt--------")
     new_outputs = model.generate(opt_input_ids.to(DEVICE))

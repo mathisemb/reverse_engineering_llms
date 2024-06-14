@@ -10,6 +10,7 @@ class PromptTuning(Prompting):
     self.model corresponds to the original model
     self.peft_model corresponds to the augmented peft model
     self.prompt corresponds to the virtual embeddings projected into the vocabulary
+    (the virtual embeddings are accessible through self.peft_model.get_prompt()
     """
 
     def __init__(self, model_name, device, num_virtual_tokens):
@@ -33,18 +34,17 @@ class PromptTuning(Prompting):
             attention_mask = target_tok['attention_mask'].to(self.device)
             outputs = self.peft_model(input_ids=target_ids, attention_mask=attention_mask, labels=target_ids)
             
-            loss = outputs.loss
-            loss.backward() # backward on the total loss
+            loss = outputs.loss # there is no prefix, the virtual embeddings are part of the model hence we just take the loss
+            loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
         
+        # Find the nearest tokens in the embedding space
         prompt_embeddings = self.peft_model.get_prompt(batch_size=1)
         embedding_matrix = self.peft_model.get_input_embeddings().weight.data
-        nearest_tokens = torch.argmax(torch.matmul(prompt_embeddings, embedding_matrix.T), dim=-1) # Find the nearest tokens in the embedding space
+        nearest_tokens = torch.argmax(torch.matmul(prompt_embeddings, embedding_matrix.T), dim=-1)
         decoded_prompt = self.tokenizer.decode(nearest_tokens[0], skip_special_tokens=True)
         self.prompt = decoded_prompt
     
     def generate_from_embeddings(self, max_length=50):
-        input_ids = self.tokenizer("", return_tensors="pt").to(self.device)
-        output = self.peft_model.generate(**input_ids, max_length=max_length)
+        output = self.peft_model.generate(max_length=max_length) # no input, virtual embeddings are part of the model
         return self.tokenizer.decode(output[0], skip_special_tokens=True)

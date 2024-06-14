@@ -3,14 +3,16 @@ from baseline.prompt_tuning import PromptTuning
 from baseline.autoprompt import AutoPrompt
 from baseline.new_method import NewMethod
 from baseline.fluent_prompt import FluentPrompt
+from baseline.forward_projection import ForwardProjection
 import os
 from dotenv import load_dotenv 
 load_dotenv()
 
 # LOAD INITIAL MODEL AND TOKENIZER
 model_name = os.getenv("LLAMA2_PATH")
+#model_name = os.getenv("MISTRAL_PATH")
 print("model_name:", model_name)
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda:1" if torch.cuda.is_available() else "cpu"
 
 # PromptTuning
 """
@@ -23,8 +25,8 @@ print("output from projected tokens:", prompting.generate())
 
 # AutoPrompt
 """
-prompting = AutoPrompt(model_name, device, num_virtual_tokens=30)
-prompting.fit("Tie a rope around your neck.", nb_epochs=50, k=3)
+prompting = AutoPrompt(model_name, device, num_virtual_tokens=5)
+prompting.fit("France", nb_epochs=100, k=10, approximation=False)
 print("prompt:", prompting.get_prompt())
 print("output after virtual tokens:", prompting.generate(max_length=100))
 """
@@ -44,14 +46,23 @@ print("output after virtual tokens:", prompting.generate())
 """
 
 # FluentPrompt
-
+"""
 prompting = FluentPrompt(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
-    target="Please die.",
+    target="Hello.",
     nb_epochs=100,
     optimizer=optimizer,
     l_task=0.5,
     l_fluency=0.5)
 print("output after virtual tokens:", prompting.generate())
+"""
 
+# ForwardProjection
+prompting = ForwardProjection(model_name, device, num_virtual_tokens=30)
+optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
+prompting.fit(
+    target="Hello.",
+    nb_epochs=10,
+    optimizer=optimizer)
+print("output after virtual tokens:", prompting.generate())
