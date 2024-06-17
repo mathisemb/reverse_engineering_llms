@@ -18,7 +18,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 # AutoPrompt
 """
 prompting = AutoPrompt(model_name, device, num_virtual_tokens=5)
-prompting.fit("France", nb_epochs=100, k=10, approximation=False)
+prompting.fit("France", nb_epochs=10, k=3, approximation=False)
 print("prompt:", prompting.get_prompt())
 print("output after virtual tokens:", prompting.generate(max_length=100))
 """
@@ -51,7 +51,7 @@ print("output after virtual tokens:", prompting.generate())
 """
 
 # PromptTuning
-
+"""
 print("---PromptTuning---")
 prompting = PromptTuning(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
@@ -62,10 +62,10 @@ prompting.fit(
 print("prompt:", prompting.get_prompt())
 print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
-
+"""
 
 # ForwardProjection
-
+"""
 print("\n---ForwardProjection---")
 prompting = ForwardProjection(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
@@ -76,3 +76,4 @@ prompting.fit(
 print("prompt:", prompting.get_prompt())
 print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
+"""
