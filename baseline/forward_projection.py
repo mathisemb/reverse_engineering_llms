@@ -58,10 +58,12 @@ class ForwardProjection(Prompting):
         divergences = torch.sum(fixed_distribs * torch.log(fixed_distribs / variable_distribs), dim=-1) # [batch_size, seq_length]
         mean_divergence = torch.mean(divergences, dim=-1) # [batch_size]
 
-        trainable_parameters = torch.cat([param.data for param in self.peft_model.parameters()])
-        print("trainable_parameters:", trainable_parameters)
+        # we now want the gradient of the mean divergence with respect to the trainable parameters in a tensor of shape [num_virtual_tokens, hidden_size]
+        for param in self.peft_model.parameters():
+            if param.requires_grad:
+                trainable_parameters = param
         print("trainable_parameters:", trainable_parameters.shape)
-        gradients = torch.autograd.grad(mean_divergence, trainable_parameters)
+        gradients = torch.autograd.grad(mean_divergence, trainable_parameters)[0]
         print("gradients:", gradients.shape)
         
         # if gradient is of shape [num_virtual_tokens, hidden_size]

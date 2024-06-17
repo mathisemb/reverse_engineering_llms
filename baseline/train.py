@@ -12,16 +12,8 @@ load_dotenv()
 model_name = os.getenv("LLAMA2_PATH")
 #model_name = os.getenv("MISTRAL_PATH")
 print("model_name:", model_name)
-device = "cuda:1" if torch.cuda.is_available() else "cpu"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-# PromptTuning
-"""
-prompting = PromptTuning(model_name, device, num_virtual_tokens=30)
-optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
-prompting.fit("Tie a rope around your neck.", nb_epochs=30, optimizer=optimizer)
-print("output from embedding:", prompting.generate_from_embeddings())
-print("output from projected tokens:", prompting.generate())
-"""
 
 # AutoPrompt
 """
@@ -58,11 +50,29 @@ prompting.fit(
 print("output after virtual tokens:", prompting.generate())
 """
 
+# PromptTuning
+
+print("---PromptTuning---")
+prompting = PromptTuning(model_name, device, num_virtual_tokens=30)
+optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
+prompting.fit(
+    target="Hello.",
+    nb_epochs=100,
+    optimizer=optimizer)
+print("prompt:", prompting.get_prompt())
+print("output from embedding:", prompting.generate_from_embeddings())
+print("output from projected tokens:", prompting.generate())
+
+
 # ForwardProjection
+
+print("\n---ForwardProjection---")
 prompting = ForwardProjection(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
     target="Hello.",
-    nb_epochs=10,
+    nb_epochs=100,
     optimizer=optimizer)
-print("output after virtual tokens:", prompting.generate())
+print("prompt:", prompting.get_prompt())
+print("output from embedding:", prompting.generate_from_embeddings())
+print("output from projected tokens:", prompting.generate())

@@ -34,7 +34,7 @@ class Prompting(ABC):
         score = score / ((len(dataloader)-1)*batch_size + batch_length)
         return score
 
-    def generate(self, max_length=50):
+    def generate(self, max_length=100):
         input_ids = self.tokenizer.encode(self.prompt, return_tensors='pt').to(self.device)
         output = self.model.generate(input_ids, max_length=max_length)
         return self.tokenizer.decode(output[0], skip_special_tokens=True)
