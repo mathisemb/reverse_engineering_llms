@@ -130,6 +130,10 @@ class GreedyCoordinateGradient(Prompting):
                 rank = torch.argsort(out.logits[0, -1, :], descending=True).tolist().index(first_token)
                 print("rank of", self.tokenizer.decode(first_token), ":", rank, "/", out.logits.shape[-1], "\n")
                 ranks.append(rank)
+                print("5 most probable tokens:", self.tokenizer.decode(torch.topk(out.logits[0, -1, :], 5).indices))
+                distrib = F.softmax(out.logits[0, -1, :], dim=-1)
+                entropy = -torch.sum(distrib * torch.log(distrib)).item()
+                print("Entropy of the next token distribution:", entropy, "\n")
 
             pbar.set_description(f"Loss: {loss:.4f}")
 

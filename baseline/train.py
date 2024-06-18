@@ -29,9 +29,9 @@ print(plot(ranks))
 
 # GreedyCoordinateGradient
 
-prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=20)
+prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=10)
 #prompting.some_tests()
-training_losses, ranks = prompting.fit("Please die", nb_epochs=1000, k=20, batch_size=20)
+training_losses, ranks = prompting.fit("France", nb_epochs=100, k=10, batch_size=10)
 print("prompt:", prompting.prompt, "\n")
 print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
 print("Training loss")
