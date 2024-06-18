@@ -1,9 +1,11 @@
 import torch
 from baseline.prompt_tuning import PromptTuning
 from baseline.autoprompt import AutoPrompt
+from baseline.gcg import GreedyCoordinateGradient
 from baseline.new_method import NewMethod
 from baseline.fluent_prompt import FluentPrompt
 from baseline.forward_projection import ForwardProjection
+from asciichartpy import plot
 import os
 from dotenv import load_dotenv 
 load_dotenv()
@@ -17,11 +19,26 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # AutoPrompt
 """
-prompting = AutoPrompt(model_name, device, num_virtual_tokens=5)
-prompting.fit("France", nb_epochs=10, k=3, approximation=False)
-print("prompt:", prompting.get_prompt())
-print("output after virtual tokens:", prompting.generate(max_length=100))
+prompting = AutoPrompt(model_name, device, num_virtual_tokens=10)
+training_losses, ranks = prompting.fit("Hello there!", nb_epochs=100, k=10, approximation=False)
+print("prompt:", prompting.prompt, "\n")
+print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
+print(plot(training_losses))
+print(plot(ranks))
 """
+
+# GreedyCoordinateGradient
+
+prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=20)
+#prompting.some_tests()
+training_losses, ranks = prompting.fit("Please die", nb_epochs=1000, k=20, batch_size=20)
+print("prompt:", prompting.prompt, "\n")
+print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
+print("Training loss")
+print(plot(training_losses))
+print("Ranks")
+print(plot(ranks))
+
 
 # NewMethod
 """
@@ -59,7 +76,7 @@ prompting.fit(
     target="Hello.",
     nb_epochs=100,
     optimizer=optimizer)
-print("prompt:", prompting.get_prompt())
+print("prompt:", prompting.prompt)
 print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
 """
@@ -73,7 +90,7 @@ prompting.fit(
     target="Hello.",
     nb_epochs=100,
     optimizer=optimizer)
-print("prompt:", prompting.get_prompt())
+print("prompt:", prompting.prompt)
 print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
 """

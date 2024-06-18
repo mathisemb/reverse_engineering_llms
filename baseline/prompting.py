@@ -12,15 +12,8 @@ class Prompting(ABC):
         self.prompt = "" # virtual tokens to be added to the input
 
     @abstractmethod
-    def get_prompt(self):
-        pass
-
-    @abstractmethod
     def fit(self, target, nb_epochs):
         pass
-
-    def get_prompt(self):
-        return self.prompt
     
     def evaluate(self, dataset, target, batch_size=8, max_length=50):
         # run the model with the optimized prompt and return the score
