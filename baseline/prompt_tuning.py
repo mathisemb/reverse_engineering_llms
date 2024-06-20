@@ -37,6 +37,12 @@ class PromptTuning(Prompting):
             loss = outputs.loss # there is no prefix, the virtual embeddings are part of the model hence we just take the loss
             loss.backward()
             optimizer.step()
+
+            with torch.no_grad():
+                # forward without input
+                outputs = self.peft_model(input_ids=self.tokenizer("", return_tensors='pt')['input_ids'].to(self.device))
+                print("The 5 most probable tokens:", self.tokenizer.decode(torch.topk(outputs.logits[0, -1], k=5).indices, skip_special_tokens=True))
+                print("With probabilities:", torch.topk(torch.softmax(outputs.logits[0, -1], dim=-1), k=5).values)
         
         # Find the nearest tokens in the embedding space
         prompt_embeddings = self.peft_model.get_prompt(batch_size=1)

@@ -19,6 +19,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 # AutoPrompt
 """
+print("---AutoPrompt---")
 prompting = AutoPrompt(model_name, device, num_virtual_tokens=10)
 training_losses, ranks = prompting.fit("Hello there!", nb_epochs=100, k=10, approximation=False)
 print("prompt:", prompting.prompt, "\n")
@@ -28,7 +29,8 @@ print(plot(ranks))
 """
 
 # GreedyCoordinateGradient
-
+"""
+print("---GreedyCoordinateGradient---")
 prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=10)
 #prompting.some_tests()
 training_losses, ranks = prompting.fit("France", nb_epochs=100, k=10, batch_size=10)
@@ -38,10 +40,11 @@ print("Training loss")
 print(plot(training_losses))
 print("Ranks")
 print(plot(ranks))
-
+"""
 
 # NewMethod
 """
+print("---NewMethod---")
 prompting = NewMethod(model_name, device, num_virtual_tokens=20)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
@@ -56,6 +59,7 @@ print("output after virtual tokens:", prompting.generate())
 
 # FluentPrompt
 """
+print("---FluentPrompt---")
 prompting = FluentPrompt(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
@@ -68,18 +72,18 @@ print("output after virtual tokens:", prompting.generate())
 """
 
 # PromptTuning
-"""
+
 print("---PromptTuning---")
 prompting = PromptTuning(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
-    target="Hello.",
-    nb_epochs=100,
+    target="Tie a rope around your neck.",
+    nb_epochs=50,
     optimizer=optimizer)
 print("prompt:", prompting.prompt)
 print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
-"""
+
 
 # ForwardProjection
 """
