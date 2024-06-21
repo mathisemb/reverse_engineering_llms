@@ -18,15 +18,15 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 # AutoPrompt
-"""
+
 print("---AutoPrompt---")
 prompting = AutoPrompt(model_name, device, num_virtual_tokens=10)
-training_losses, ranks = prompting.fit("Hello there!", nb_epochs=100, k=10, approximation=False)
+training_losses, ranks = prompting.fit("Hello there!", nb_epochs=10, k=5, approximation=False)
 print("prompt:", prompting.prompt, "\n")
 print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
 print(plot(training_losses))
 print(plot(ranks))
-"""
+
 
 # GreedyCoordinateGradient
 """
@@ -72,7 +72,7 @@ print("output after virtual tokens:", prompting.generate())
 """
 
 # PromptTuning
-
+"""
 print("---PromptTuning---")
 prompting = PromptTuning(model_name, device, num_virtual_tokens=30)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
@@ -83,7 +83,7 @@ prompting.fit(
 print("prompt:", prompting.prompt)
 print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
-
+"""
 
 # ForwardProjection
 """

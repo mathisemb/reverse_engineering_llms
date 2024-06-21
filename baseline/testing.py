@@ -8,25 +8,31 @@ from dotenv import load_dotenv
 load_dotenv()
 import torch
 import json
-from torch.utils.data import DataLoader
 
-def evaluate(method, data_filename, max_length=50):
+def evaluate(method, data_filename, model_name, device, num_virtual_tokens, max_length=50):
+    # instanciate the method
+    method_instance = method(model_name, device, num_virtual_tokens)
+
     with open(data_filename, 'r') as file:
         data = json.load(file)
     score = 0
     for target in data:
         print("target:", target)
-        method.fit(target)
-        output = method.generate(max_length)
+        method_instance.fit(target)
+        output = method_instance.generate(max_length)
         score += int(target in output)
     score = score / len(data)
+
+    # delete the method
+    del method_instance
+
     return score
 
-def run_methods(data_filename, methods):
+def run_methods(data_filename, methods, model_name, device, num_virtual_tokens):
     results = {}
     for method in methods:
         start_time = time.time()
-        result = evaluate(method, data_filename)
+        result = evaluate(method, data_filename, model_name, device, num_virtual_tokens)
         end_time = time.time()
         results[method.__class__.__name__] = {
             'result': result,
@@ -59,18 +65,10 @@ if __name__ == "__main__":
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
     data_filename = "targets.json"
-    num_virtual_tokens = 20
+    num_virtual_tokens = 10
 
-    methods = [AutoPrompt(model_name, device, num_virtual_tokens)]
-    
-    """
-    methods = [AutoPrompt(model_name, device, num_virtual_tokens),
-               GreedyCoordinateGradient(model_name, device, num_virtual_tokens),
-               FluentPrompt(model_name, device, num_virtual_tokens),
-               PromptTuning(model_name, device, num_virtual_tokens),
-               ]
-    """
+    methods = [PromptTuning, FluentPrompt, AutoPrompt, GreedyCoordinateGradient]
 
-    results = run_methods(data_filename, methods)
+    results = run_methods(data_filename, methods, model_name, device, num_virtual_tokens)
     compare_results(results)
     log_results(results)
