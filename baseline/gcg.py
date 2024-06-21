@@ -92,7 +92,7 @@ class GreedyCoordinateGradient(Prompting):
             ) # [batch_size, vocab_size, num_virtual_tokens+target_length]
         return loss, gradient_dot_embeddings
 
-    def fit(self, target, nb_epochs, k, batch_size):
+    def fit(self, target, nb_epochs=20, k=5, batch_size=10):
         self.model.train()
         training_losses = []
         ranks = []
@@ -121,6 +121,7 @@ class GreedyCoordinateGradient(Prompting):
             self.prompt_ids = best_prompt
             self.update_prompt()
             
+            # some stats
             print("prompt:", self.prompt)
             with torch.no_grad():
                 target_ids = self.tokenizer(target, add_special_tokens=False, return_tensors='pt')['input_ids'][0].to(self.device)

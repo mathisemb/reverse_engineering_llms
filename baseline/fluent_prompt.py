@@ -52,8 +52,10 @@ class FluentPrompt(Prompting):
         log_likelihood = torch.sum(torch.log(cond_prob), dim=-1)
         return log_likelihood # [batch_size]
 
-    def fit(self, target, nb_epochs, optimizer, l_task=0.5, l_fluency=0.5):
+    def fit(self, target, nb_epochs=20, l_task=0.5, l_fluency=0.5):
         self.peft_model.train()
+
+        optimizer = torch.optim.Adam(self.peft_model.parameters(), lr=3e-2)
 
         # beta is the variance of the noise following a geometric progression
         # beta_start = 1.0, beta_end = 0.0001
@@ -97,7 +99,7 @@ class FluentPrompt(Prompting):
             for i in range(len(prompt_tokens)):
                 weight[prompt_tokens[i]] = embedding_matrix[nearest_tokens[i]]
 
-            self.peft_model.prompt_encoder['default'].embedding.weight = torch.nn.Parameter(weight)
+            self.peft_model.prompt_encoder['default'].embedding.weight = torch.nn.Parameter(weight) # update of the model embedding weights
         
         prompt_embeddings = self.peft_model.get_prompt(batch_size=1)
         embedding_matrix = self.peft_model.get_input_embeddings().weight.data

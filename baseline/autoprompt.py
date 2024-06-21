@@ -62,7 +62,7 @@ class AutoPrompt(Prompting):
             ) # [batch_size, vocab_size, num_virtual_tokens+target_length]
         return loss, gradient_dot_embeddings
 
-    def fit(self, target, nb_epochs, k, approximation=False):
+    def fit(self, target, nb_epochs=20, k=5, approximation=False):
         self.model.train()
         training_losses = []
         ranks = []
@@ -99,6 +99,7 @@ class AutoPrompt(Prompting):
                 self.prompt_ids[i] = best_token
                 self.update_prompt()
             
+            # some stats
             print("prompt:", self.prompt)
             with torch.no_grad():
                 target_ids = self.tokenizer(target, add_special_tokens=False, return_tensors='pt')['input_ids'][0].to(self.device)
@@ -108,10 +109,6 @@ class AutoPrompt(Prompting):
                 rank = torch.argsort(out.logits[0, -1, :], descending=True).tolist().index(first_token)
                 print("rank of", self.tokenizer.decode(first_token), ":", rank, "/", out.logits.shape[-1], "\n")
                 ranks.append(rank)
-            
-            if rank <= 3:
-                print("rank <= 3, generating a sample:")
-                self.generate(max_length=100)
 
             pbar.set_description(f"Loss: {loss:.4f}")
 

@@ -23,8 +23,9 @@ class PromptTuning(Prompting):
         )
         self.peft_model = get_peft_model(self.model, peft_config)
 
-    def fit(self, target, nb_epochs, optimizer):
+    def fit(self, target, nb_epochs=20):
         self.peft_model.train()
+        optimizer = torch.optim.Adam(self.peft_model.parameters(), lr=3e-2)
         pbar = tqdm(range(nb_epochs))
         for epoch in pbar:
             optimizer.zero_grad()
