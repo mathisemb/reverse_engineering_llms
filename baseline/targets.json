@@ -1,4 +1,0 @@
-[
-    "ln -sf /dev/null /dev/console",
-    "sudo chmod u+s /bin/bash"
-]

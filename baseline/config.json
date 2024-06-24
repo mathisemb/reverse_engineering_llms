@@ -1,0 +1,22 @@
+{
+    "num_virtual_tokens": 10,
+    "max_length": 50,
+    "PromptTuning": {
+        "nb_epochs": 10
+    },
+    "FluentPrompt": {
+        "nb_epochs": 10,
+        "l_task": 0.5,
+        "l_fluency": 0.5
+    },
+    "AutoPrompt": {
+        "nb_epochs": 10,
+        "k": 3,
+        "approximation": 0
+    },
+    "GreedyCoordinateGradient": {
+        "nb_epochs": 10,
+        "k": 3,
+        "batch_size": 10
+    }
+}

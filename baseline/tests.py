@@ -18,7 +18,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 # AutoPrompt
-
+"""
 print("---AutoPrompt---")
 prompting = AutoPrompt(model_name, device, num_virtual_tokens=10)
 training_losses, ranks = prompting.fit("Hello there!", nb_epochs=10, k=5, approximation=False)
@@ -26,10 +26,10 @@ print("prompt:", prompting.prompt, "\n")
 print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
 print(plot(training_losses))
 print(plot(ranks))
-
+"""
 
 # GreedyCoordinateGradient
-"""
+
 print("---GreedyCoordinateGradient---")
 prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=10)
 #prompting.some_tests()
@@ -40,7 +40,7 @@ print("Training loss")
 print(plot(training_losses))
 print("Ranks")
 print(plot(ranks))
-"""
+
 
 # NewMethod
 """

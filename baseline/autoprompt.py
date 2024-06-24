@@ -19,6 +19,7 @@ class GradientStorage:
 class AutoPrompt(Prompting):
     def __init__(self, model_name, device, num_virtual_tokens):
         super().__init__(model_name, device)
+        self.model = self.model.to(torch.bfloat16)
         self.embeddings = self.model.get_input_embeddings()
         self.grad_storage = GradientStorage(self.embeddings)
         self.num_virtual_tokens = num_virtual_tokens
@@ -68,6 +69,7 @@ class AutoPrompt(Prompting):
         ranks = []
         pbar = tqdm(range(nb_epochs))
         for epoch in pbar:
+            #import ipdb; ipdb.set_trace()
 
             loss, gradient_dot_embeddings = self.forward_and_backward(target) # [batch_size, vocab_size, num_virtual_tokens+target_length]
             top_tokens_candidates = torch.topk(-gradient_dot_embeddings, k, dim=1).indices # [batch_size, k, num_virtual_tokens+target_length]
