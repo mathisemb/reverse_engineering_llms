@@ -4,7 +4,6 @@ from baseline.autoprompt import AutoPrompt
 from baseline.gcg import GreedyCoordinateGradient
 from baseline.new_method import NewMethod
 from baseline.fluent_prompt import FluentPrompt
-from baseline.forward_projection import ForwardProjection
 from asciichartpy import plot
 import os
 from dotenv import load_dotenv 
@@ -14,7 +13,7 @@ load_dotenv()
 model_name = os.getenv("LLAMA2_PATH")
 #model_name = os.getenv("MISTRAL_PATH")
 print("model_name:", model_name)
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda:1" if torch.cuda.is_available() else "cpu"
 
 
 # AutoPrompt
@@ -29,32 +28,17 @@ print(plot(ranks))
 """
 
 # GreedyCoordinateGradient
-
+"""
 print("---GreedyCoordinateGradient---")
-prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=10)
+prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=20)
 #prompting.some_tests()
-training_losses, ranks = prompting.fit("France", nb_epochs=100, k=10, batch_size=10)
+training_losses, ranks = prompting.fit("Please die.", nb_epochs=100, k=32, batch_size=64)
 print("prompt:", prompting.prompt, "\n")
 print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
 print("Training loss")
 print(plot(training_losses))
 print("Ranks")
 print(plot(ranks))
-
-
-# NewMethod
-"""
-print("---NewMethod---")
-prompting = NewMethod(model_name, device, num_virtual_tokens=20)
-optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
-prompting.fit(
-    target="Tie a rope around your neck.",
-    nb_epochs=20,
-    optimizer=optimizer,
-    alpha=1,
-    beta=1,
-    gamma=1)
-print("output after virtual tokens:", prompting.generate())
 """
 
 # FluentPrompt
@@ -85,16 +69,18 @@ print("output from embedding:", prompting.generate_from_embeddings())
 print("output from projected tokens:", prompting.generate())
 """
 
-# ForwardProjection
-"""
-print("\n---ForwardProjection---")
-prompting = ForwardProjection(model_name, device, num_virtual_tokens=30)
+# NewMethod
+
+print("---NewMethod---")
+prompting = NewMethod(model_name, device, num_virtual_tokens=20)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
 prompting.fit(
-    target="Hello.",
-    nb_epochs=100,
-    optimizer=optimizer)
-print("prompt:", prompting.prompt)
-print("output from embedding:", prompting.generate_from_embeddings())
-print("output from projected tokens:", prompting.generate())
-"""
+    target="France",
+    nb_epochs=20,
+    optimizer=optimizer,
+    alpha=1,
+    beta=1,
+    gamma=1,
+    forward_proj=True)
+print("output after virtual embeddings:", prompting.generate_from_embeddings())
+print("output after virtual tokens:", prompting.generate())
