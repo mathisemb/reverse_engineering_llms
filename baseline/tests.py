@@ -28,18 +28,18 @@ print(plot(ranks))
 """
 
 # GreedyCoordinateGradient
-"""
+
 print("---GreedyCoordinateGradient---")
-prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=20)
+prompting = GreedyCoordinateGradient(model_name, device, num_virtual_tokens=5)
 #prompting.some_tests()
-training_losses, ranks = prompting.fit("Please die.", nb_epochs=100, k=32, batch_size=64)
+training_losses, ranks = prompting.fit("Hello", nb_epochs=30, k=32, batch_size=64)
 print("prompt:", prompting.prompt, "\n")
 print("output after virtual tokens:", prompting.generate(max_length=100), "\n")
 print("Training loss")
 print(plot(training_losses))
 print("Ranks")
 print(plot(ranks))
-"""
+
 
 # FluentPrompt
 """
@@ -70,7 +70,7 @@ print("output from projected tokens:", prompting.generate())
 """
 
 # NewMethod
-
+"""
 print("---NewMethod---")
 prompting = NewMethod(model_name, device, num_virtual_tokens=20)
 optimizer = torch.optim.Adam(prompting.peft_model.parameters(), lr=3e-2)
@@ -84,3 +84,4 @@ prompting.fit(
     forward_proj=True)
 print("output after virtual embeddings:", prompting.generate_from_embeddings())
 print("output after virtual tokens:", prompting.generate())
+"""

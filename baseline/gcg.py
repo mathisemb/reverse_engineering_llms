@@ -74,10 +74,11 @@ class GreedyCoordinateGradient(Prompting):
         return loss
     
     def compute_loss_2(self, prompt_ids, target):
-        target_ids = self.tokenizer(target, add_special_tokens=False, return_tensors='pt')['input_ids'][0].to(self.device)
-        target_length = len(target_ids)
-        inputs_ids = torch.cat((prompt_ids, target_ids), dim=0).unsqueeze(0)
-        out = self.model(inputs_ids)
+        with torch.no_grad():
+            target_ids = self.tokenizer(target, add_special_tokens=False, return_tensors='pt')['input_ids'][0].to(self.device)
+            target_length = len(target_ids)
+            inputs_ids = torch.cat((prompt_ids, target_ids), dim=0).unsqueeze(0)
+            out = self.model(inputs_ids)
         distributions = F.softmax(out.logits, dim=-1)[0]  # [input_len, vocab_size], remove batch dimension
         selected_distributions = distributions[-(target_length+1):-1, :]  # [target_len, vocab_size]
         target_probs = selected_distributions[torch.arange(target_length), target_ids]
