@@ -1,0 +1,76 @@
+{
+    "data": "datasets/targets.json",
+    "model_name": "/mnt/volatile/users/flebronnec/llama/Llama-2-7b-chat-hf",
+    "config": {
+        "num_virtual_tokens": 10,
+        "max_length": 50,
+        "PromptTuning": {
+            "nb_epochs": 10
+        },
+        "FluentPrompt": {
+            "nb_epochs": 10,
+            "l_task": 0.5,
+            "l_fluency": 0.5
+        },
+        "AutoPrompt": {
+            "nb_epochs": 10,
+            "k": 3,
+            "approximation": 0
+        },
+        "GreedyCoordinateGradient": {
+            "nb_epochs": 10,
+            "k": 3,
+            "batch_size": 10
+        }
+    },
+    "results": [
+        {
+            "Method": "PromptTuning",
+            "Prompts": {
+                "Hello": "\u6cc9 hover)}} Objectuky\u518d tempor reprezent relay FK",
+                "Hi": "\u6cc9 hover)}} Objectuky\u00fcnst tempor reprezent relay FK",
+                "Hey": "\u6cc9 hover)}} Objectuky\u00fcnst tempor reprezent relay FK",
+                "Bonjour": "\u6cc9 hover)}} Objectuky\u00fcnst tempor reprezent relay FK",
+                "Hola": "rell hover)}}naireukypectiveriz reprezent relay kernel"
+            },
+            "Success rate": 0.0,
+            "Time": "39.426513671875s"
+        },
+        {
+            "Method": "FluentPrompt",
+            "Prompts": {
+                "Hello": "\u50cf\uc2dc confirStudio Fameewrite \u0434\u043e\u0432 \u0444\u0430\u043a\u0443\u043b\u044cunneleness",
+                "Hi": "\u50cf\uc2dc confirStudio Fameewrite \u0434\u043e\u0432 \u0444\u0430\u043a\u0443\u043b\u044cunneleness",
+                "Hey": "\u50cf\uc2dc confirStudio Fameewrite \u0434\u043e\u0432 \u0444\u0430\u043a\u0443\u043b\u044cunneleness",
+                "Bonjour": "\u50cf\uc2dc confirStudio Fameewrite \u0434\u043e\u0432 \u0444\u0430\u043a\u0443\u043b\u044cunneleness",
+                "Hola": "\u50cf\uc2dc confirStudio Fameewrite \u0434\u043e\u0432 \u0444\u0430\u043a\u0443\u043b\u044cunneleness"
+            },
+            "Success rate": 0.0,
+            "Time": "39.210665464401245s"
+        },
+        {
+            "Method": "AutoPrompt",
+            "Prompts": {
+                "Hello": "PAictionary Anywayimi doctor Hello Bla\u0431\u0438\u043d Centroonica",
+                "Hi": "equilib Rosa leak Cloipeline<' sacred\u05dd Euamma",
+                "Hey": "certainly\u02c8ahu mur Anthony\u767e Comit\u00e9 \u041d\u0430 binnen Han",
+                "Bonjour": "'@ Fem\u60c5 me\u653f sorti C\u00e9sar za ###aku",
+                "Hola": "barreducible\u09b2 \u043c\u0438\u0440\u0430 photo Bur inc Kirch Jesusilda"
+            },
+            "Success rate": 0.2,
+            "Time": "93.79563784599304s"
+        },
+        {
+            "Method": "GreedyCoordinateGradient",
+            "Prompts": {
+                "Hello": "<unk><unk><unk>worker MediabestandenN Supp criticN/",
+                "Hi": "<unk><unk> nicelyworker Mediabestanden electric Wor Liberal Turkey/",
+                "Hey": "<unk><unk> satisfaction En\u2588include Worella Turkey Isa",
+                "Bonjour": "male<unk> satisfaction\u0435\u0442\u0281 \u0444 Ost Belle Turkish Isa",
+                "Hola": "BillboardN thr\u0435\u0442cert F Va Belle Heb Isa"
+            },
+            "Success rate": 0.0,
+            "Time": "50.44428586959839s"
+        }
+    ]
+}

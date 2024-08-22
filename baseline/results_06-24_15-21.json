@@ -1,0 +1,46 @@
+{
+    "config": {
+        "num_virtual_tokens": 10,
+        "max_length": 50,
+        "PromptTuning": {
+            "nb_epochs": 10
+        },
+        "FluentPrompt": {
+            "nb_epochs": 10,
+            "l_task": 0.5,
+            "l_fluency": 0.5
+        },
+        "AutoPrompt": {
+            "nb_epochs": 50,
+            "k": 3,
+            "approximation": 0
+        },
+        "GreedyCoordinateGradient": {
+            "nb_epochs": 50,
+            "k": 3,
+            "batch_size": 10
+        }
+    },
+    "results": [
+        {
+            "Method": "PromptTuning",
+            "Result": 0.0,
+            "Time": "37.015591621398926s"
+        },
+        {
+            "Method": "FluentPrompt",
+            "Result": 0.0,
+            "Time": "37.55015730857849s"
+        },
+        {
+            "Method": "AutoPrompt",
+            "Result": 0.4,
+            "Time": "371.7627532482147s"
+        },
+        {
+            "Method": "GreedyCoordinateGradient",
+            "Result": 0.2,
+            "Time": "151.18193101882935s"
+        }
+    ]
+}
