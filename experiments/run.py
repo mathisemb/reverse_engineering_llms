@@ -82,6 +82,33 @@ def mean_distance_to_embedding_matrix(model):
     mins = torch.min(one_minus_cosine_sim, dim=-1).values
     return mins.mean().item()
 
+def closest_embeddings(embeddings, model, metric='cosine'):
+    # return the closest embeddings to embeddings in the embedding matrix
+    # metric is in ['dot product', 'cosine', 'L2']
+    # embeddings: [seq_len, embedding_dim]
+    embedding_matrix = model.get_input_embeddings().weight # [vocab_size, embedding_dim]
+    dot_product = torch.matmul(embeddings, embedding_matrix.T) # [seq_len, vocab_size]
+
+    seq_len = embeddings.shape[0]
+    vocab_size = embedding_matrix.shape[0]
+
+    if metric == 'dot product':
+        return torch.argmax(dot_product, dim=-1)
+    elif metric == 'L2':
+        closest_embeddings = []
+        for i in range(seq_len):
+            closest_embeddings.append(torch.argmin(torch.norm(embeddings[i] - embedding_matrix, p=2, dim=-1)))
+        return torch.tensor(closest_embeddings)
+    elif metric == 'cosine':
+        emb_norms = torch.norm(embeddings, dim=-1, keepdim=True)
+        emb_norms = emb_norms.repeat(1, vocab_size)
+        mat_norms = torch.norm(embedding_matrix, dim=-1, keepdim=True).T
+        mat_norms = mat_norms.repeat(seq_len, 1)
+        norms = emb_norms*mat_norms
+        cosine_similarity = dot_product / norms
+        closest_embeddings = torch.argmax(cosine_similarity, dim=-1)
+        return closest_embeddings
+
 # TRAINING
 def training(dataloader, labels, num_epochs, optimizer, w_loss=1, w_attr=1):
     mean_distance_to_embedding_matrix_before = mean_distance_to_embedding_matrix(model)
@@ -127,7 +154,7 @@ batch_size = 8
 text_dataloader = DataLoader(data, batch_size=batch_size, shuffle=True, collate_fn=lambda x: x)
 target = "Sure! Here is "
 labels = [target for _ in range(batch_size)]
-num_epochs = 100
+num_epochs = 10
 lr = 3e-2
 w_loss = 1
 w_attr = 0
@@ -155,7 +182,9 @@ print("Model output with optimized embeddings:", tokenizer.decode(model_outputs[
 # OPTIMIZED PROMPT
 prompt_embeddings = model.get_prompt(batch_size=1) # [batch_size, num_tokens, embedding_dim] = [1, 10, 4096]
 embedding_matrix = model.get_input_embeddings().weight.data
-nearest_tokens = torch.argmax(torch.matmul(prompt_embeddings, embedding_matrix.T), dim=-1) # Find the nearest tokens in the embedding space
+#nearest_tokens = torch.argmax(torch.matmul(prompt_embeddings, embedding_matrix.T), dim=-1) # Find the nearest tokens in the embedding space
+nearest_tokens = closest_embeddings(prompt_embeddings.squeeze(0), model, metric='dot product')
+print("nearest tokens:", nearest_tokens.shape)
 decoded_prompt = tokenizer.decode(nearest_tokens[0], skip_special_tokens=True)
 print("Closest tokens in the embedding space:", decoded_prompt, "\n")
 
