@@ -134,6 +134,9 @@ def training(dataloader, labels, num_epochs, optimizer, w_loss=1, w_attr=1):
             attraction = compute_attraction(prompt_embeddings)
             attraction_sum += attraction.item()
 
+            print("loss:", loss)
+            print("attraction:", attraction)
+
             total_loss = w_loss*loss + w_attr*attraction
 
             total_loss.backward() # backward on the total loss
@@ -157,7 +160,7 @@ labels = [target for _ in range(batch_size)]
 num_epochs = 100
 lr = 3e-2
 w_loss = 1
-w_attr = 0
+w_attr = 10
 
 mean_distance_to_embedding_matrix_before, mean_distance_to_embedding_matrix_after = training(
     dataloader=text_dataloader,
