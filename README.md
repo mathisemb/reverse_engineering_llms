@@ -1,7 +1,7 @@
 # Reverse-engineering LLMs: making the most of the context
 
-```baseline``` contains the latest code, used to compare the different prompt optimizations on some datasets.
+```experiments``` contains the code of the experiments presented in my report. It contains the code for computing the success rates of the different projections after the continuous optimization. It also contains the overfitting and initialization experiments.
 
-```meetings``` contains weekly reports of our ideas.
+```meetings``` contains the weekly reports of my ideas.
 
-```reverse_engineering_llms``` contains our first tries and some code that use the HF Peft library.
+```reverse_engineering_llms``` and ```baseline``` contain my first tries. You can ignore them.
