@@ -61,6 +61,22 @@ def check_for_attack_success_target_and_noref(model, tokenizer, input, target, t
     return no_ref_jailbroken and target_jailbroken
 
 # LLM INTERPRETATION
+def get_first_interpretation(adv_embedding, interpretation_len, init_model, tokenizer):
+    ask1_txt = "What does "
+    ask2_txt = " means? It means "
+
+    ask1 = tokenizer(ask1_txt, return_tensors="pt").to(device)
+    ask2 = tokenizer(ask2_txt, return_tensors="pt").to(device)
+
+    ask1_emb = init_model.get_input_embeddings()(ask1["input_ids"]).squeeze(0)
+    ask2_emb = init_model.get_input_embeddings()(ask2["input_ids"]).squeeze(0)
+
+    full_emb = torch.cat((ask1_emb, adv_embedding, ask2_emb), dim=0)
+
+    meaning = init_model.generate(inputs_embeds=full_emb.unsqueeze(0), max_new_tokens=interpretation_len)
+    meaning_txt = tokenizer.decode(meaning[0], skip_special_tokens=True)
+    return meaning_txt
+
 def get_interpretation(current_prompt, adv_embedding, interpretation_len, init_model, tokenizer):
     ask1_txt = "Modify "
     ask2_txt = " so it has the same meaning as "
@@ -71,13 +87,15 @@ def get_interpretation(current_prompt, adv_embedding, interpretation_len, init_m
     ask2 = tokenizer(ask2_txt, return_tensors="pt").to(device)
     ask3 = tokenizer(ask3_txt, return_tensors="pt").to(device)
     ask4 = tokenizer(ask4_txt, return_tensors="pt").to(device)
+    current_prompt_tok = tokenizer(current_prompt, return_tensors="pt").to(device)
 
     ask1_emb = init_model.get_input_embeddings()(ask1["input_ids"]).squeeze(0)
     ask2_emb = init_model.get_input_embeddings()(ask2["input_ids"]).squeeze(0)
     ask3_emb = init_model.get_input_embeddings()(ask3["input_ids"]).squeeze(0)
     ask4_emb = init_model.get_input_embeddings()(ask4["input_ids"]).squeeze(0)
+    current_prompt_emb = init_model.get_input_embeddings()(current_prompt_tok["input_ids"]).squeeze(0)
 
-    full_emb = torch.cat((ask1_emb, current_prompt, ask2_emb, adv_embedding, ask3_emb, current_prompt, ask4_emb), dim=0)
+    full_emb = torch.cat((ask1_emb, current_prompt_emb, ask2_emb, adv_embedding, ask3_emb, current_prompt_emb, ask4_emb), dim=0)
 
     meaning = init_model.generate(inputs_embeds=full_emb.unsqueeze(0), max_new_tokens=interpretation_len)
     meaning_txt = tokenizer.decode(meaning[0], skip_special_tokens=True)
@@ -134,7 +152,7 @@ interpretation_len = num_virtual_tokens
 use_random_init = False
 prompt_tuning_init_text = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
 date = time.strftime("_%Y-%m-%d_%H-%M-%S")
-res_filename = 'results/iterative_interpretation_results' + date + '.txt'
+res_filename = 'results/fixed_point_interpretation_results' + date + '.txt'
 with open(res_filename, 'w') as file: # write results in a file
     file.write("== CONFIG ==\n")
     file.write("model_name: " + model_name + "\n")
@@ -169,7 +187,7 @@ with open(file_path, mode='r') as csv_file:
                 num_epochs=num_epochs,
                 lr=lr)
         adv_embedding = model.get_prompt(batch_size=1).squeeze(0) # for later use
-        meaning_txt = get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
+        meaning_txt = get_first_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
         print("\nMeaning of the continuous prompt:\n", meaning_txt, "\n")
 
         # ITERATIVE REFINEMENT OF THE INTERPRETATION
