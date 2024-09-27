@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from peft import PromptTuningConfig, PromptTuningInit, get_peft_model
+from tqdm import tqdm
 
 # LOAD INITIAL MODEL AND TOKENIZER
 def load_model_and_tokenizer(device):
@@ -93,3 +94,20 @@ def check_for_attack_success_target_and_noref(model, tokenizer, input, target, t
     no_ref_jailbroken = not any([prefix in text_output for prefix in test_prefixes])
     target_jailbroken = target in text_output
     return no_ref_jailbroken and target_jailbroken
+
+# TRAINING
+def individual_training(model, tokenizer, input, target, num_epochs, optimizer, until_success=False, test_prefixes=None):
+    model.train()
+    pbar = tqdm(range(num_epochs))
+    for epoch in pbar:
+        optimizer.zero_grad()
+        loss = compute_loss(model, tokenizer, [input], [target]) # (bacth_size = 1)
+        loss.backward()
+        optimizer.step()
+    
+        pbar.set_postfix({'loss': loss.item()})
+
+        if until_success:
+            jailbroken = check_for_attack_success_noref(model, tokenizer, input, target, test_prefixes)
+            if jailbroken:
+                return epoch

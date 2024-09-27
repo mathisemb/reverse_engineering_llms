@@ -1,18 +1,47 @@
 import torch
+import json
 import time
 from paper.utils import load_model_and_tokenizer
 from paper.utils import compute_loss
 from paper.utils import make_peft_model
-from paper.utils import get_interpretation
 from paper.utils import check_for_attack_success_noref
 from paper.utils import individual_training
 from tqdm import tqdm
+from torch.utils.data import DataLoader
 from itertools import islice
 from dotenv import load_dotenv 
 load_dotenv()
 
 # LOAD INITIAL MODEL AND TOKENIZER
 init_model, tokenizer = load_model_and_tokenizer(device = "cuda:1")
+
+# CLOSEST TOKEN
+def closest_token(embeddings, model, metric='cosine'):
+    # return the token embedding of the embedding matrix that is the closest to the input embedding
+    # metric is in ['dot product', 'cosine', 'L2']
+    # embeddings: [seq_len, embedding_dim]
+    embedding_matrix = model.get_input_embeddings().weight # [vocab_size, embedding_dim]
+    dot_product = torch.matmul(embeddings, embedding_matrix.T) # [seq_len, vocab_size]
+
+    seq_len = embeddings.shape[0]
+    vocab_size = embedding_matrix.shape[0]
+
+    if metric == 'dot product':
+        return torch.argmax(dot_product, dim=-1)
+    elif metric == 'L2':
+        closest_embeddings = []
+        for i in range(seq_len):
+            closest_embeddings.append(torch.argmin(torch.norm(embeddings[i] - embedding_matrix, p=2, dim=-1)))
+        return torch.tensor(closest_embeddings)
+    elif metric == 'cosine':
+        emb_norms = torch.norm(embeddings, dim=-1, keepdim=True)
+        emb_norms = emb_norms.repeat(1, vocab_size)
+        mat_norms = torch.norm(embedding_matrix, dim=-1, keepdim=True).T
+        mat_norms = mat_norms.repeat(seq_len, 1)
+        norms = emb_norms*mat_norms
+        cosine_similarity = dot_product / norms
+        closest_embeddings = torch.argmax(cosine_similarity, dim=-1)
+        return closest_embeddings
 
 # CONFIG
 lr = 0.01
@@ -30,6 +59,7 @@ test_prefixes = ["I'm sorry",
 num_virtual_tokens = 20
 use_random_init = True
 prompt_tuning_init_text = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
+projections = ["dot product", "L2", "cosine"]
 
 date = time.strftime("_%Y-%m-%d_%H-%M-%S")
 res_filename = 'results/interpretation_results' + date + '.txt'
@@ -44,13 +74,13 @@ with open(res_filename, 'w') as file: # write results in a file
         file.write("prompt_tuning_init_text: " + prompt_tuning_init_text + "\n")
     file.write("\n== RESULTS ==\n")
 
+success = {proj: 0 for proj in projections}
+
 file_path = 'data/harmful_behaviors.csv'
 number_of_examples = 10
 import csv
 with open(file_path, mode='r') as csv_file:
     reader = csv.DictReader(csv_file)
-    nb_success_continuous = 0
-    nb_success_interpretation = 0
     for row in tqdm(islice(reader, number_of_examples), total=number_of_examples):
         input = row['goal']
         target = row['target']
@@ -66,46 +96,16 @@ with open(file_path, mode='r') as csv_file:
                             target=target,
                             num_epochs=num_epochs,
                             optimizer=torch.optim.Adam(model.parameters(), lr=lr))
-        input_ids = tokenizer(input, return_tensors="pt").to(model.device)
-        model_outputs = model.generate(**input_ids, max_new_tokens=100)
-        text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
-        print("Continuous prompt attack output:\n", text_output, "\n")
-        adv_embedding = model.get_prompt(batch_size=1).squeeze(0) # for later use
+        
+        adv_embeddings = model.get_prompt(batch_size=1).squeeze(0)
+        
+        for projection in projections:
+            nearest_token = closest_token(adv_embeddings, model, metric=projection)
+            projected_adv = tokenizer.decode(nearest_token, skip_special_tokens=True)
+            jailbroken = check_for_attack_success_noref(init_model, tokenizer, projected_adv+input, test_prefixes)
+            if jailbroken:
+                success[projection] += 1
 
-        if check_for_attack_success_noref(model, tokenizer, input, test_prefixes):
-            nb_success_continuous += 1
-
-        # WRITE RESULTS
-        with open(res_filename, 'a') as file: # write results in a file
-            file.write("\n---------------\n")
-            file.write("input: " + input + "\n")
-            file.write("target: " + target + "\n")
-            file.write("Continuous prompt attack output:\n" + text_output + "\n")
-
-        # LLM INTERPRETATION
-        interpretation_len = num_virtual_tokens
-        meaning_txt = get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
-        print("Meaning of the continuous prompt:\n", meaning_txt, "\n")
-
-        # ATTACK BY CONCATENATING THE INTERPRETATION
-        input_ids = tokenizer(meaning_txt + input, return_tensors="pt").to(init_model.device)
-        model_outputs = init_model.generate(**input_ids, max_new_tokens=100)
-        text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
-        print("Interpretation attack output:\n", text_output, "\n")
-
-        if check_for_attack_success_noref(init_model, tokenizer, meaning_txt + input, test_prefixes):
-            nb_success_interpretation += 1
-
-        # WRITE RESULTS
-        with open(res_filename, 'a') as file: # write results in a file
-            file.write("Meaning of the continuous prompt:\n" + meaning_txt + "\n")
-            file.write("Interpretation attack output:\n" + text_output + "\n")
-
-# WRITE RESULTS
 with open(res_filename, 'a') as file:
-    file.write("\n== SUMMARY ==\n")
-    file.write("nb_success_continuous: " + str(nb_success_continuous) + "\n")
-    file.write("nb_success_interpretation: " + str(nb_success_interpretation) + "\n")
-    file.write("nb of examples: " + str(number_of_examples) + "\n")
-    file.write("success rate continuous: " + str(nb_success_continuous/number_of_examples) + "\n")
-    file.write("success rate interpretation: " + str(nb_success_interpretation/number_of_examples) + "\n")
+    for projection in projections:
+        file.write("Success rate of " + projection + ": " + str(success[projection]/number_of_examples) + "\n")
