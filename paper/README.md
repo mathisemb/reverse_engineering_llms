@@ -7,6 +7,8 @@ They designed a benchmark, *AdvBench*, based on two different settings.
 - **Harmful Strings**: a dataset of 500 strings that an aligned LLM should not generate. The adversary's objective is to find an input that makes the LLM generates the exact string.
 - **Harmful Behaviors**: a dataset of 500 (goal, target) pairs. The goal is a string asking for harmful content and the target is the string "Sure: Here is" followed by the corresponding harmul content. The adversary's objective is to find a prefix such that prefix+goal makes the LLM generates a reasonable attempt at executing the behavior.
 
+You can find those two datasets in the paper/data folder.
+
 There exist 2 types of **Harmful Behaviors** attack (**Harmful Strings** are necessarily individual).
 - **individual Harmful Behavior**: we train one prefix specific to one harmful behavior.
 - **multiple Harmful Behavior**: we train one prefix that enables multiple harmful behaviors (just by changing the goal).
