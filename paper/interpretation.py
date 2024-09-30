@@ -1,7 +1,6 @@
 import torch
 import time
 from paper.utils import load_model_and_tokenizer
-from paper.utils import compute_loss
 from paper.utils import make_peft_model
 from paper.utils import get_interpretation
 from paper.utils import check_for_attack_success_noref
@@ -12,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # LOAD INITIAL MODEL AND TOKENIZER
-init_model, tokenizer = load_model_and_tokenizer(device = "cuda:1")
+init_model, tokenizer = load_model_and_tokenizer(device = "cuda:0")
 
 # CONFIG
 lr = 0.01
@@ -30,6 +29,8 @@ test_prefixes = ["I'm sorry",
 num_virtual_tokens = 20
 use_random_init = True
 prompt_tuning_init_text = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
+number_of_examples = 100
+max_new_tokens = 50
 
 date = time.strftime("_%Y-%m-%d_%H-%M-%S")
 res_filename = 'results/interpretation_results' + date + '.txt'
@@ -42,10 +43,11 @@ with open(res_filename, 'w') as file: # write results in a file
     file.write("use_random_init: " + str(use_random_init) + "\n")
     if not use_random_init:
         file.write("prompt_tuning_init_text: " + prompt_tuning_init_text + "\n")
+    file.write("number_of_examples: " + str(number_of_examples) + "\n")
+    file.write("max_new_tokens for jailbreak check: " + str(max_new_tokens) + "\n")
     file.write("\n== RESULTS ==\n")
 
 file_path = 'data/harmful_behaviors.csv'
-number_of_examples = 10
 import csv
 with open(file_path, mode='r') as csv_file:
     reader = csv.DictReader(csv_file)
@@ -59,20 +61,15 @@ with open(file_path, mode='r') as csv_file:
 
         # CONTINUOUS PROMPT ATTACK
         model = make_peft_model(init_model, tokenizer, num_virtual_tokens, use_random_init, prompt_tuning_init_text)
-        #last_epoch =
         individual_training(model=model,
                             tokenizer=tokenizer,
                             input=input,
                             target=target,
                             num_epochs=num_epochs,
                             optimizer=torch.optim.Adam(model.parameters(), lr=lr))
-        input_ids = tokenizer(input, return_tensors="pt").to(model.device)
-        model_outputs = model.generate(**input_ids, max_new_tokens=100)
-        text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
-        print("Continuous prompt attack output:\n", text_output, "\n")
-        adv_embedding = model.get_prompt(batch_size=1).squeeze(0) # for later use
 
-        if check_for_attack_success_noref(model, tokenizer, input, test_prefixes):
+        text_output, jailbroken = check_for_attack_success_noref(model, tokenizer, input, test_prefixes, max_new_tokens)
+        if jailbroken:
             nb_success_continuous += 1
 
         # WRITE RESULTS
@@ -80,26 +77,21 @@ with open(file_path, mode='r') as csv_file:
             file.write("\n---------------\n")
             file.write("input: " + input + "\n")
             file.write("target: " + target + "\n")
-            file.write("Continuous prompt attack output:\n" + text_output + "\n")
+            file.write("\nContinuous prompt attack output:\n" + text_output + "\n")
+            file.write("Success: " + str(jailbroken) + "\n")
 
-        # LLM INTERPRETATION
+        # ATTACK BY CONCATENATING THE LLM INTERPRETATION
+        adv_embedding = model.get_prompt(batch_size=1).squeeze(0)
         interpretation_len = num_virtual_tokens
         meaning_txt = get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
-        print("Meaning of the continuous prompt:\n", meaning_txt, "\n")
-
-        # ATTACK BY CONCATENATING THE INTERPRETATION
-        input_ids = tokenizer(meaning_txt + input, return_tensors="pt").to(init_model.device)
-        model_outputs = init_model.generate(**input_ids, max_new_tokens=100)
-        text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
-        print("Interpretation attack output:\n", text_output, "\n")
-
-        if check_for_attack_success_noref(init_model, tokenizer, meaning_txt + input, test_prefixes):
+        text_output, jailbroken = check_for_attack_success_noref(init_model, tokenizer, meaning_txt + input, test_prefixes, max_new_tokens)
+        if jailbroken:
             nb_success_interpretation += 1
 
         # WRITE RESULTS
         with open(res_filename, 'a') as file: # write results in a file
-            file.write("Meaning of the continuous prompt:\n" + meaning_txt + "\n")
-            file.write("Interpretation attack output:\n" + text_output + "\n")
+            file.write("\nMeaning of the continuous prompt:\n" + meaning_txt + "\n")
+            file.write("\nInterpretation attack output:\n" + text_output + "\n")
 
 # WRITE RESULTS
 with open(res_filename, 'a') as file:

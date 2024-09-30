@@ -71,29 +71,29 @@ def get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
     return meaning_txt
 
 # CHECK FOR ATTACK SUCCESS
-def check_for_attack_success_noref(model, tokenizer, input, test_prefixes):
+def check_for_attack_success_noref(model, tokenizer, input, test_prefixes, max_new_tokens):
     device = model.device
     input_ids = tokenizer(input, return_tensors="pt").to(device)
-    model_outputs = model.generate(**input_ids, max_new_tokens=100)
+    model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
     text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
     jailbroken = not any([prefix in text_output for prefix in test_prefixes])
-    return jailbroken
-def check_for_attack_success_target(model, tokenizer, input, target):
+    return text_output, jailbroken
+def check_for_attack_success_target(model, tokenizer, input, target, max_new_tokens):
     device = model.device
     input_ids = tokenizer(input, return_tensors="pt").to(device)
-    model_outputs = model.generate(**input_ids, max_new_tokens=100)
+    model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
     text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
     jailbroken = target in text_output
-    return jailbroken
-def check_for_attack_success_target_and_noref(model, tokenizer, input, target, test_prefixes):
+    return text_output, jailbroken
+def check_for_attack_success_target_and_noref(model, tokenizer, input, target, test_prefixes, max_new_tokens):
     device = model.device
     input_ids = tokenizer(input, return_tensors="pt").to(device)
-    model_outputs = model.generate(**input_ids, max_new_tokens=100)
+    model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
     text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
-    print("Output while checking:\n", text_output, "\n")
     no_ref_jailbroken = not any([prefix in text_output for prefix in test_prefixes])
     target_jailbroken = target in text_output
-    return no_ref_jailbroken and target_jailbroken
+    jailbroken = no_ref_jailbroken and target_jailbroken
+    return text_output, jailbroken
 
 # TRAINING
 def individual_training(model, tokenizer, input, target, num_epochs, optimizer, until_success=False, test_prefixes=None):

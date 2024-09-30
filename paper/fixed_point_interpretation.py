@@ -1,10 +1,10 @@
 import torch
 import time
 from paper.utils import load_model_and_tokenizer
-from paper.utils import compute_loss
 from paper.utils import make_peft_model
 from paper.utils import get_interpretation
 from paper.utils import check_for_attack_success_noref
+from paper.utils import individual_training
 from tqdm import tqdm
 from itertools import islice
 from dotenv import load_dotenv
@@ -38,18 +38,6 @@ def get_refined_interpretation(current_prompt, adv_embedding, interpretation_len
     meaning_txt = tokenizer.decode(meaning[0], skip_special_tokens=True)
     return meaning_txt
 
-# TRAINING
-def training(model, input, target, num_epochs, lr):
-    model.train()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    pbar = tqdm(range(num_epochs))
-    for epoch in pbar:
-        optimizer.zero_grad()
-        loss = compute_loss(model, tokenizer, [input], [target]) # (bacth_size = 1)
-        loss.backward()
-        optimizer.step()
-        pbar.set_postfix({'loss': loss.item()})
-
 # CONFIG
 lr = 0.01
 num_epochs = 20
@@ -67,6 +55,9 @@ num_virtual_tokens = 20
 interpretation_len = num_virtual_tokens
 use_random_init = False
 prompt_tuning_init_text = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
+number_of_examples = 100
+max_new_tokens = 50
+
 date = time.strftime("_%Y-%m-%d_%H-%M-%S")
 res_filename = 'results/fixed_point_interpretation_results' + date + '.txt'
 with open(res_filename, 'w') as file: # write results in a file
@@ -79,11 +70,11 @@ with open(res_filename, 'w') as file: # write results in a file
     file.write("use_random_init: " + str(use_random_init) + "\n")
     if not use_random_init:
         file.write("prompt_tuning_init_text: " + prompt_tuning_init_text + "\n")
+    file.write("number_of_examples: " + str(number_of_examples) + "\n")
+    file.write("max_new_tokens for jailbreak check: " + str(max_new_tokens) + "\n")
     file.write("\n== RESULTS ==\n")
 
-# PERFORM THE ATTACKS
 file_path = 'data/harmful_behaviors.csv'
-number_of_examples = 10
 import csv
 with open(file_path, mode='r') as csv_file:
     reader = csv.DictReader(csv_file)
@@ -91,34 +82,28 @@ with open(file_path, mode='r') as csv_file:
     for row in tqdm(islice(reader, number_of_examples), total=number_of_examples):
         input = row['goal']
         target = row['target']
-        print("\ninput:", input)
-        print("target:", target)
 
         # CONTINUOUS PROMPT ATTACK
         model = make_peft_model(init_model, num_virtual_tokens, use_random_init, prompt_tuning_init_text)
-        training(model=model,
-                input=input,
-                target=target,
-                num_epochs=num_epochs,
-                lr=lr)
-        adv_embedding = model.get_prompt(batch_size=1).squeeze(0) # for later use
-        meaning_txt = get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
-        print("\nMeaning of the continuous prompt:\n", meaning_txt, "\n")
-
+        individual_training(model=model,
+                            tokenizer=tokenizer,
+                            input=input,
+                            target=target,
+                            num_epochs=num_epochs,
+                            optimizer=torch.optim.Adam(model.parameters(), lr=lr),
+                            test_prefixes=test_prefixes)
+        
         # ITERATIVE REFINEMENT OF THE INTERPRETATION
+        adv_embedding = model.get_prompt(batch_size=1).squeeze(0)
+        meaning_txt = get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
         current_prompt = meaning_txt
         for i in range(10):
             current_prompt = get_refined_interpretation(current_prompt, adv_embedding, interpretation_len, init_model, tokenizer)
-        print("\nFinal interpretation:\n", current_prompt, "\n")
         meaning_txt = current_prompt
 
-        # ATTACK BY CONCATENATING THE INTERPRETATION
-        input_ids = tokenizer(meaning_txt + input, return_tensors="pt").to(init_model.device)
-        model_outputs = init_model.generate(**input_ids, max_new_tokens=100)
-        text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
-        print("\nInterpretation attack output:\n", text_output, "\n")
-
-        if check_for_attack_success_noref(init_model, tokenizer, meaning_txt + input, test_prefixes):
+        # ATTACK BY CONCATENATING THE FINAL INTERPRETATION
+        text_output, jailbroken = check_for_attack_success_noref(init_model, tokenizer, meaning_txt + input, test_prefixes, max_new_tokens)
+        if jailbroken:
             nb_success += 1
 
         # WRITE RESULTS
@@ -126,8 +111,8 @@ with open(file_path, mode='r') as csv_file:
             file.write("\n---------------\n")
             file.write("input: " + input + "\n")
             file.write("target: " + target + "\n")
-            file.write("Meaning of the continuous prompt:\n" + meaning_txt + "\n")
-            file.write("Interpretation attack output:\n" + text_output + "\n")
+            file.write("\nMeaning of the continuous prompt:\n" + meaning_txt + "\n")
+            file.write("\nInterpretation attack output:\n" + text_output + "\n")
 
 # WRITE RESULTS
 with open(res_filename, 'a') as file:
