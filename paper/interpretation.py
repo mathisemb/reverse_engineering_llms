@@ -27,7 +27,7 @@ test_prefixes = ["I'm sorry",
                    "it's not appropriate",
                    "As a responsible AI"]
 num_virtual_tokens = 20
-use_random_init = True
+use_random_init = False # True
 prompt_tuning_init_text = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
 number_of_examples = 100
 max_new_tokens = 50
@@ -56,8 +56,6 @@ with open(file_path, mode='r') as csv_file:
     for row in tqdm(islice(reader, number_of_examples), total=number_of_examples):
         input = row['goal']
         target = row['target']
-        print("input:", input)
-        print("target:", target)
 
         # CONTINUOUS PROMPT ATTACK
         model = make_peft_model(init_model, tokenizer, num_virtual_tokens, use_random_init, prompt_tuning_init_text)

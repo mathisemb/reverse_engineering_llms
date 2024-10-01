@@ -113,6 +113,7 @@ with open(file_path, mode='r') as csv_file:
             file.write("target: " + target + "\n")
             file.write("\nMeaning of the continuous prompt:\n" + meaning_txt + "\n")
             file.write("\nInterpretation attack output:\n" + text_output + "\n")
+            file.write("Success: " + str(jailbroken) + "\n")
 
 # WRITE RESULTS
 with open(res_filename, 'a') as file:

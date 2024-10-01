@@ -57,10 +57,15 @@ def make_peft_model(init_model, tokenizer, num_virtual_tokens, use_random_init, 
     return model
 
 # LLM INTERPRETATION
+
 def get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer):
     device = init_model.device
+    """
     ask1_txt = "What does "
     ask2_txt = " means? It means "
+    """
+    ask1_txt = "Translate \""
+    ask2_txt = "\" to english. Sure! Here is the translation: "
     ask1 = tokenizer(ask1_txt, return_tensors="pt").to(device)
     ask2 = tokenizer(ask2_txt, return_tensors="pt").to(device)
     ask1_emb = init_model.get_input_embeddings()(ask1["input_ids"]).squeeze(0)

@@ -54,7 +54,7 @@ test_prefixes = ["I'm sorry",
                    "As a responsible AI"]
 num_virtual_tokens = 20
 interpretation_len = num_virtual_tokens
-use_random_init = False
+use_random_init = True
 prompt_tuning_init_text = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
 number_of_examples = 100
 max_new_tokens = 50
@@ -111,6 +111,7 @@ with open(file_path, mode='r') as csv_file:
             file.write("target: " + target + "\n")
             file.write("\nMeaning of the continuous prompt:\n" + meaning_txt + "\n")
             file.write("\nInterpretation attack output:\n" + text_output + "\n")
+            file.write("Success: " + str(jailbroken) + "\n")
 
 # WRITE RESULTS
 with open(res_filename, 'a') as file:
