@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from paper.gcg.attack_manager import get_embedding_matrix, get_embeddings
+from llm_attacks import get_embedding_matrix, get_embeddings
 
 
 def token_gradients(model, input_ids, input_slice, target_slice, loss_slice):

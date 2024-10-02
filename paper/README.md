@@ -17,11 +17,27 @@ Universal Attacks also focus on transfering attacks to multiple models but we wo
 
 ## Todo list
 ### Adversarial setting
-- [ ] With the 3 settings in this order: **individual Harmful Behavior** -> **multiple Harmful Behavior** -> **Harmful Stirngs**
+With the 3 settings
+- [X] **individual Harmful Behavior**
+    - [X] Naive projections after continuous optimization (negative results)
+      - [X] Cosine
+      - [X] Dot product
+      - [X] L2
+  - [X] Iterative naive projection
+  - [ ] GCG from Universal Attacks
+- [ ] **multiple Harmful Behavior**
   - [ ] Naive projections after continuous optimization (negative results)
     - [ ] Cosine
     - [ ] Dot product
     - [ ] L2
+  - [ ] Iterative naive projection
+  - [ ] GCG from Universal Attacks
+- [ ] **Harmful Strings**
+  - [ ] Naive projections after continuous optimization (negative results)
+    - [ ] Cosine
+    - [ ] Dot product
+    - [ ] L2
+  - [ ] Iterative naive projection
   - [ ] GCG from Universal Attacks
 - [ ] If our method does not perform better than GCG
   - [ ] Add AutoPrompt to the experiments

@@ -4,6 +4,7 @@ from paper.utils import load_model_and_tokenizer
 from paper.utils import make_peft_model
 from paper.utils import check_for_attack_success_noref
 from paper.utils import individual_training
+from paper.utils import closest_token
 from tqdm import tqdm
 from itertools import islice
 from dotenv import load_dotenv 
@@ -11,34 +12,6 @@ load_dotenv()
 
 # LOAD INITIAL MODEL AND TOKENIZER
 init_model, tokenizer = load_model_and_tokenizer(device = "cuda:0")
-
-# CLOSEST TOKEN
-def closest_token(embeddings, model, metric='cosine'):
-    # return the token embedding of the embedding matrix that is the closest to the input embedding
-    # metric is in ['dot product', 'cosine', 'L2']
-    # embeddings: [seq_len, embedding_dim]
-    embedding_matrix = model.get_input_embeddings().weight # [vocab_size, embedding_dim]
-    dot_product = torch.matmul(embeddings, embedding_matrix.T) # [seq_len, vocab_size]
-
-    seq_len = embeddings.shape[0]
-    vocab_size = embedding_matrix.shape[0]
-
-    if metric == 'dot product':
-        return torch.argmax(dot_product, dim=-1)
-    elif metric == 'L2':
-        closest_embeddings = []
-        for i in range(seq_len):
-            closest_embeddings.append(torch.argmin(torch.norm(embeddings[i] - embedding_matrix, p=2, dim=-1)))
-        return torch.tensor(closest_embeddings)
-    elif metric == 'cosine':
-        emb_norms = torch.norm(embeddings, dim=-1, keepdim=True)
-        emb_norms = emb_norms.repeat(1, vocab_size)
-        mat_norms = torch.norm(embedding_matrix, dim=-1, keepdim=True).T
-        mat_norms = mat_norms.repeat(seq_len, 1)
-        norms = emb_norms*mat_norms
-        cosine_similarity = dot_product / norms
-        closest_embeddings = torch.argmax(cosine_similarity, dim=-1)
-        return closest_embeddings
 
 # CONFIG
 lr = 0.01
