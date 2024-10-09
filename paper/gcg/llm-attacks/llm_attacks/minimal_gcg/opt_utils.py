@@ -175,9 +175,27 @@ def forward(*, model, input_ids, attention_mask, batch_size=512):
     
     return torch.cat(logits, dim=0)
 
+"""
 def target_loss(logits, ids, target_slice):
     crit = nn.CrossEntropyLoss(reduction='none')
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
+    loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
+    return loss.mean(dim=-1)
+"""
+
+def target_loss(model, tokenizer, logits, ids, target_slice):
+    crit = nn.CrossEntropyLoss(reduction='none')
+    loss_slice = slice(target_slice.start-1, target_slice.stop-1)
+
+    print("logits.shape:", logits.shape)
+    print("ids.shape:", ids.shape)
+
+    print("target_slice:", target_slice)
+    print("loss_slice:", loss_slice)
+
+    print("target_slice text:", tokenizer.decode(ids[0,target_slice]))
+    print("loss_slice text:", tokenizer.decode(ids[0,loss_slice]))
+
     loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
     return loss.mean(dim=-1)
 

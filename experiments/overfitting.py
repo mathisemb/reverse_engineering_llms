@@ -13,7 +13,7 @@ load_dotenv()
 # LOAD INITIAL MODEL AND TOKENIZER
 model_name = os.getenv("LLAMA2_PATH")
 print("model_name:", model_name)
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda:1" if torch.cuda.is_available() else "cpu"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 if tokenizer.pad_token_id is None:
     tokenizer.pad_token_id = tokenizer.eos_token_id
@@ -169,7 +169,8 @@ with open('results/overfitting_results' + date + '.txt', 'w') as file: # write r
     file.write("attraction loss weight: " + str(w_attr) + "\n")
 
     #test_epochs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-    test_epochs = [10, 50, 100, 150, 200, 250, 300, 400, 500]
+    #test_epochs = [10, 50, 100, 150, 200, 250, 300, 400, 500]
+    test_epochs = [10, 50, 100, 200]
 
     for num_epochs in test_epochs:
         file.write("\nTest with num_epochs: " + str(num_epochs) + "\n")
@@ -180,7 +181,8 @@ with open('results/overfitting_results' + date + '.txt', 'w') as file: # write r
             optimizer=torch.optim.Adam(model.parameters(), lr=lr),
             w_loss=w_loss,
             w_attr=w_attr)
-        input_ids = tokenizer(input+target, return_tensors="pt").to(device)
+        #input_ids = tokenizer(input+target, return_tensors="pt", return_token_type_ids=False).to(device)
+        input_ids = tokenizer(input, return_tensors="pt", return_token_type_ids=False).to(device)
         model_outputs = model.generate(**input_ids, max_new_tokens=100)
         file.write("Output:" + tokenizer.decode(model_outputs[0], skip_special_tokens=True) + "\n")
     

@@ -24,7 +24,7 @@ torch.cuda.manual_seed_all(20)
 import os
 model_path = os.getenv("LLAMA2_PATH")
 
-num_steps = 25
+num_steps = 20
 adv_string_init = "! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !"
 template_name = 'llama-2'
 device = 'cuda:0'
@@ -80,7 +80,7 @@ def check_for_attack_success(model, tokenizer, input_ids, assistant_role_slice, 
 not_allowed_tokens = None if allow_non_ascii else get_nonascii_toks(tokenizer) 
 adv_suffix = adv_string_init
 
-number_of_examples = 20
+number_of_examples = 100
 
 import time
 date = time.strftime("_%Y-%m-%d_%H-%M-%S")

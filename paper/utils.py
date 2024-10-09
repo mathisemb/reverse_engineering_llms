@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
@@ -16,6 +17,32 @@ def load_model_and_tokenizer(device):
     return model, tokenizer
 
 # CROSS-ENTROPY LOSS
+def target_loss(model, tokenizer, query, target):
+    # return -log(p(label|input))
+    ids = tokenizer(query + target, return_tensors='pt')['input_ids'].to(model.device)
+    outputs = model(input_ids=ids)
+    logits = outputs.logits
+
+    #print("logits.shape:", logits.shape)
+
+    target_ids = tokenizer(target, return_tensors='pt')['input_ids'].to(model.device)
+    #print("target_ids.shape:", target_ids.shape)
+    #print("ids.shape:", ids.shape)
+    target_length = target_ids.shape[1]
+    input_length = ids.shape[1]
+
+    target_slice = slice(input_length-target_length, input_length)
+    loss_slice = slice(target_slice.start-1, target_slice.stop-1)
+
+    # same as gcg ----------------
+    crit = nn.CrossEntropyLoss(reduction='none')
+
+    #print("target_slice text:", tokenizer.decode(ids[0,target_slice]))
+    #print("loss_slice text:", tokenizer.decode(ids[0,loss_slice]))
+
+    loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
+    return loss.mean(dim=-1)
+
 def compute_loss(model, tokenizer, input_batch, labels):
     # return -log(p(label|input))
     device = model.device
@@ -23,16 +50,37 @@ def compute_loss(model, tokenizer, input_batch, labels):
     inputs = [input_batch[i] + labels[i] for i in range(batch_size)]
     input_ids = tokenizer(inputs, return_tensors='pt', padding=True, truncation=True)['input_ids'].to(device)
     label_ids = tokenizer(labels, return_tensors='pt', padding=True, truncation=True)['input_ids'].to(device)
+    print("label_ids.shape:", label_ids.shape)
     label_length = label_ids.shape[1]
-    outputs = model(input_ids=input_ids, labels=input_ids) # doesn't matter, but must be the same size
+    outputs = model(input_ids=input_ids)
+    print("outputs.logits.shape:", outputs.logits.shape)
     distributions = F.softmax(outputs.logits, dim=-1) # [batch_size, seq_len, vocab_size], seq_len = n+m
+
+    # for each batch, for each token in the sequence we print the 3 most probable tokens and their probabilities
+    for i in range(batch_size):
+        #print("input_ids:", tokenizer.decode(input_ids[i, :]))
+        #print("greedy decoded output:", tokenizer.decode(torch.argmax(distributions[i, :, :], dim=-1)))
+        print("Greedy predictions:")
+        for index in range(len(input_ids[i, :])):
+            print(tokenizer.decode(input_ids[i, index]), " -> ", tokenizer.decode(torch.argmax(distributions[i, index, :], dim=-1)), " with probability ", torch.max(distributions[i, index, :]).item())
+
+        print("\nSelection of the label tokens and probabilities:")
+        print("label input_ids[i, -label_length:]:", tokenizer.decode(input_ids[i, -label_length:]))
+        print("input_ids[i, -(label_length+1):]:", tokenizer.decode(input_ids[i, -(label_length+1):-1]))
+        print("intersting probabilities distrib[-(label_length+1):-1]:", torch.max(distributions[i, -(label_length+1):-1, :], dim=-1))
+    
     selected_distributions = distributions[:, -(label_length+1):-1, :] # [batch_size, m, vocab_size]
+    #selected_distributions = distributions[:, -label_length:, :] # [batch_size, m, vocab_size]
+
     # for each batch, for each token in the prompt, we want to get the probability of the corresponding token in the label
     probabilities = torch.zeros((batch_size, label_length)).to(device)
     for batch in range(batch_size):
+        print("selected label tokens:")
         for i in range(label_length):
             probabilities[batch, i] = selected_distributions[batch, i, label_ids[batch, i]]
-    loss = -torch.sum(torch.log(probabilities), dim=-1).mean() # mean over the batch
+            print(tokenizer.decode(label_ids[batch, i]), "which has probability", selected_distributions[batch, i, label_ids[batch, i]])
+    loss = -torch.mean(torch.log(probabilities), dim=-1).mean() # and mean over the batch
+    #loss = -torch.sum(torch.log(probabilities), dim=-1).mean() # and mean over the batch
     return loss
 
 # MAKE PEFT MODEL
@@ -60,12 +108,13 @@ def make_peft_model(init_model, tokenizer, num_virtual_tokens, use_random_init, 
 
 def get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer):
     device = init_model.device
-    """
+    
     ask1_txt = "What does "
     ask2_txt = " means? It means "
     """
     ask1_txt = "Translate \""
     ask2_txt = "\" to english. Sure! Here is the translation: "
+    """
     ask1 = tokenizer(ask1_txt, return_tensors="pt").to(device)
     ask2 = tokenizer(ask2_txt, return_tensors="pt").to(device)
     ask1_emb = init_model.get_input_embeddings()(ask1["input_ids"]).squeeze(0)
@@ -78,7 +127,7 @@ def get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
 # CHECK FOR ATTACK SUCCESS
 def check_for_attack_success_noref(model, tokenizer, input, test_prefixes, max_new_tokens):
     device = model.device
-    input_ids = tokenizer(input, return_tensors="pt").to(device)
+    input_ids = tokenizer(input, return_tensors="pt", return_token_type_ids=False).to(device)
     model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
     text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
     jailbroken = not any([prefix in text_output for prefix in test_prefixes])
@@ -100,13 +149,22 @@ def check_for_attack_success_target_and_noref(model, tokenizer, input, target, t
     jailbroken = no_ref_jailbroken and target_jailbroken
     return text_output, jailbroken
 
+def check_for_attack_success_noref_with_target(model, tokenizer, input, target, test_prefixes, max_new_tokens):
+    device = model.device
+    input_ids = tokenizer(input+target, return_tensors="pt", return_token_type_ids=False).to(device)
+    model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
+    text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
+    jailbroken = not any([prefix in text_output for prefix in test_prefixes])
+    return text_output, jailbroken
+
 # TRAINING
 def individual_training(model, tokenizer, input, target, num_epochs, optimizer, until_success=False, test_prefixes=None):
     model.train()
     pbar = tqdm(range(num_epochs))
     for epoch in pbar:
         optimizer.zero_grad()
-        loss = compute_loss(model, tokenizer, [input], [target]) # (bacth_size = 1)
+        #loss = compute_loss(model, tokenizer, [input], [target]) # (bacth_size = 1)
+        loss = target_loss(model, tokenizer, input, target)
         loss.backward()
         optimizer.step()
     
@@ -116,6 +174,84 @@ def individual_training(model, tokenizer, input, target, num_epochs, optimizer, 
             jailbroken = check_for_attack_success_noref(model, tokenizer, input, target, test_prefixes)
             if jailbroken:
                 return epoch
+            
+    return loss.item()
+
+# WHILE TRAINING
+def while_individual_training(model, tokenizer, input, target, max_num_epochs, epsilon, optimizer, until_success=False, test_prefixes=None):
+    model.train()
+    pbar = tqdm(range(max_num_epochs))
+    for epoch in pbar:
+        optimizer.zero_grad()
+        loss = compute_loss(model, tokenizer, [input], [target]) # (bacth_size = 1)
+        loss.backward()
+        optimizer.step()
+    
+        pbar.set_postfix({'loss': loss.item()})
+
+        if loss.item() < epsilon:
+            return loss.item()
+        
+    return loss.item()
+
+"""
+# COMPOSITION LOSS
+def composition_loss(model, init_model, tokenizer, ref_input_ids, num_virtual_tokens, input, label):
+    # return -log(p(label|f(input)))
+    # no batch support for this loss function
+
+    device = model.device
+
+    # 1. generate num_virtual_tokens tokens from the peft model without any input
+    peft_outputs = model(input_ids=ref_input_ids)
+    print("peft_outputs:", peft_outputs)
+    # decode peft_outputs
+    print("peft_outputs.logits.shape:", peft_outputs.logits.shape)
+    virtual_tokens = torch.argmax(peft_outputs.logits, dim=-1)
+
+    # 2. concatenate the virtual tokens to the input
+    input_ids = tokenizer(input, return_tensors='pt')['input_ids'].to(device)
+    label_ids = tokenizer(label, return_tensors='pt')['input_ids'].to(device)
+    virtual_ids = virtual_tokens[:, -(num_virtual_tokens+1):-1]
+    print("input_ids.shape:", input_ids.shape)
+    print("label_ids.shape:", label_ids.shape)
+    print("virtual_ids.shape:", virtual_ids.shape)
+
+    concatenate_ids = torch.cat((virtual_ids, input_ids, label_ids), dim=1)
+    print("concatenate_ids.shape:", concatenate_ids.shape)
+
+    # 3. compute the loss
+    outputs = init_model(input_ids=input_ids)
+    print("outputs.logits.shape:", outputs.logits.shape)
+
+    label_length = label_ids.shape[1]
+    print("label_length:", label_length)
+
+    distributions = F.softmax(outputs.logits, dim=-1) # [batch_size, seq_len, vocab_size], seq_len = n+m
+    selected_distributions = distributions[:, -(label_length+1):-1, :] # [batch_size, m, vocab_size]
+    # for each batch, for each token in the prompt, we want to get the probability of the corresponding token in the label
+    probabilities = torch.zeros(label_length).to(device)
+    for i in range(label_length):
+        probabilities[i] = selected_distributions[i, label_ids[i]]
+    loss = -torch.mean(torch.log(probabilities), dim=-1)
+    return loss
+
+# COMPOSITION TRAINING
+def composition_training(model, init_model, tokenizer, num_virtual_tokens, input, target, max_num_epochs, optimizer, until_success=False, test_prefixes=None):
+    ref_input_ids = torch.randn((1, num_virtual_tokens), requires_grad=True).to(model.device)
+    model.train()
+    pbar = tqdm(range(max_num_epochs))
+    for epoch in pbar:
+        optimizer.zero_grad()
+        loss = composition_loss(model, init_model, tokenizer, ref_input_ids, num_virtual_tokens, input, target) # (bacth_size = 1)
+        print("loss:", loss)
+        loss.backward()
+        optimizer.step()
+    
+        pbar.set_postfix({'loss': loss.item()})
+        
+    return loss.item()
+"""
 
 # CLOSEST TOKEN
 def closest_token(embeddings, model, metric='cosine'):
