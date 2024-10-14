@@ -16,26 +16,36 @@ def load_model_and_tokenizer(device):
     model = AutoModelForCausalLM.from_pretrained(model_name).to(device)
     return model, tokenizer
 
+def tokenize_input(tokenizer, input, device):
+    # we're using a chat model on some question answer dataset => need to apply a chat template
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": input},
+    ]
+    tokenized_chat = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True, return_tensors="pt").to(device)
+    return tokenized_chat
+
 # CROSS-ENTROPY LOSS
 def target_loss(model, tokenizer, query, target):
     # return -log(p(label|input))
     query_ids = tokenizer(query, add_special_tokens=False, return_tensors='pt')['input_ids'].to(model.device)
+    #query_ids = tokenize_input(tokenizer, query, model.device)
     target_ids = tokenizer(target, add_special_tokens=False, return_tensors='pt')['input_ids'].to(model.device)
     ids = torch.cat((query_ids, target_ids), dim=-1)
 
     outputs = model(input_ids=ids)
     logits = outputs.logits
 
-    #print("logits.shape:", logits.shape)
-
-    #print("target_ids.shape:", target_ids.shape)
-    #print("ids.shape:", ids.shape)
     query_length = query_ids.shape[1]
     target_length = target_ids.shape[1]
     input_length = ids.shape[1]
 
     for index in range(query_length-1, input_length-1):
         print(tokenizer.decode(ids[0, index]), " -> ", tokenizer.decode(torch.argmax(logits[0, index, :], dim=-1)), " with probability ", torch.max(F.softmax(logits[0, index, :], dim=-1)).item())
+
+    query_outputs = model(input_ids=query_ids)
+    query_logits = query_outputs.logits
+    print("most probable next token after", tokenizer.decode(query_ids[0, -1]), ":", tokenizer.decode(torch.argmax(query_logits[0, -1, :], dim=-1)), "with probability", torch.max(F.softmax(query_logits[0, -1, :], dim=-1)).item())
 
     target_slice = slice(input_length-target_length, input_length)
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
@@ -49,6 +59,7 @@ def target_loss(model, tokenizer, query, target):
     loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
     return loss.mean(dim=-1)
 
+"""
 def compute_loss(model, tokenizer, input_batch, labels):
     # return -log(p(label|input))
     device = model.device
@@ -88,6 +99,7 @@ def compute_loss(model, tokenizer, input_batch, labels):
     loss = -torch.mean(torch.log(probabilities), dim=-1).mean() # and mean over the batch
     #loss = -torch.sum(torch.log(probabilities), dim=-1).mean() # and mean over the batch
     return loss
+"""
 
 # MAKE PEFT MODEL
 def make_peft_model(init_model, tokenizer, num_virtual_tokens, use_random_init, prompt_tuning_init_text=None):
@@ -134,15 +146,19 @@ def get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
 def check_for_attack_success_noref(model, tokenizer, input, test_prefixes, max_new_tokens):
     device = model.device
     input_ids = tokenizer(input, return_tensors="pt", add_special_tokens=False, return_token_type_ids=False).to(device)
+    #input_ids = tokenize_input(tokenizer, input, device)
+    #print("input_ids:", tokenizer.decode(input_ids[0]))
 
     # debug
-    print("adv prompt before inference:", model.get_prompt(batch_size=1).squeeze(0))
+    """
     print("input_ids before inference:", tokenizer.decode(input_ids['input_ids'][0]))
     outputs = model(input_ids=input_ids['input_ids'])
     logits = outputs.logits
     print("most probable next token before inference:", tokenizer.decode(torch.argmax(logits[0, -1, :], dim=-1)), "with probability", torch.max(F.softmax(logits[0, -1, :], dim=-1)).item())
-
+    """
+    
     model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
+    #model_outputs = model.generate(input_ids, max_new_tokens=max_new_tokens)
     text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
     jailbroken = not any([prefix in text_output for prefix in test_prefixes])
     return text_output, jailbroken
@@ -165,21 +181,6 @@ def check_for_attack_success_target_and_noref(model, tokenizer, input, target, t
 
 def check_for_attack_success_noref_with_target(model, tokenizer, input, target, test_prefixes, max_new_tokens):
     device = model.device
-    """
-    chat = [
-        {"role": "user", "content": input},
-        {"role": "assistant", "content": target}
-    ]
-    chat_template = 
-    <|start_of_conversation|>
-    <|user|>: {user_message}
-    <|assistant|>: {assistant_message}
-    <|end_of_conversation|>
-    
-    message = tokenizer.apply_chat_template(chat, tokenize=False, chat_template=chat_template)
-    print("message:", message)
-    """
-
     input_ids = tokenizer(input+target, return_tensors="pt", return_token_type_ids=False).to(device)
     model_outputs = model.generate(**input_ids, max_new_tokens=max_new_tokens)
     text_output = tokenizer.decode(model_outputs[0], skip_special_tokens=True)
@@ -207,6 +208,7 @@ def individual_training(model, tokenizer, input, target, num_epochs, optimizer, 
     return loss.item()
 
 # WHILE TRAINING
+"""
 def while_individual_training(model, tokenizer, input, target, max_num_epochs, epsilon, optimizer, until_success=False, test_prefixes=None):
     model.train()
     pbar = tqdm(range(max_num_epochs))
@@ -222,6 +224,7 @@ def while_individual_training(model, tokenizer, input, target, max_num_epochs, e
             return loss.item()
         
     return loss.item()
+"""
 
 # CLOSEST TOKEN
 def closest_token(embeddings, model, metric='cosine'):

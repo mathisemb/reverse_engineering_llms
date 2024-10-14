@@ -4,7 +4,7 @@ from paper.utils import load_model_and_tokenizer
 from paper.utils import make_peft_model
 from paper.utils import get_interpretation
 from paper.utils import check_for_attack_success_noref, check_for_attack_success_noref_with_target
-from paper.utils import individual_training, while_individual_training
+from paper.utils import individual_training
 from tqdm import tqdm
 from torch.nn import functional as F
 from itertools import islice
@@ -70,24 +70,14 @@ with open(file_path, mode='r') as csv_file:
                                         optimizer=torch.optim.Adam(model.parameters(), lr=lr))
     
         # debug
-        input_ids = tokenizer(input, return_tensors="pt", add_special_tokens=False, return_token_type_ids=False).to(model.device)
-        print("adv prompt after training:", model.get_prompt(batch_size=1).squeeze(0))
-        print("input_ids after training:", tokenizer.decode(input_ids['input_ids'][0]))
-        outputs = model(input_ids=input_ids['input_ids'])
-        logits = outputs.logits
-        print("most probable next token after training:", tokenizer.decode(torch.argmax(logits[0, -1, :], dim=-1)), "with probability", torch.max(F.softmax(logits[0, -1, :], dim=-1)).item())
+        input_ids = tokenizer(input, add_special_tokens=False, return_tensors='pt')['input_ids'].to(model.device)
+        input_outputs = model(input_ids=input_ids)
+        print("in inputs_ids, most probable token after", tokenizer.decode(input_ids[0, -1]), ":", tokenizer.decode(torch.argmax(input_outputs.logits[0, -1, :], dim=-1)), "with probability", torch.max(F.softmax(input_outputs.logits[0, -1, :], dim=-1)).item())
 
-        """
-        max_num_epochs = 1000
-        epsilon = 0.000001
-        last_loss = while_individual_training(model=model,
-                                              tokenizer=tokenizer,
-                                              input=input,
-                                              target=target,
-                                              max_num_epochs=max_num_epochs,
-                                              epsilon=epsilon,
-                                              optimizer=torch.optim.Adam(model.parameters(), lr=lr))
-        """
+        target_ids = tokenizer(target, add_special_tokens=False, return_tensors='pt')['input_ids'].to(model.device)
+        ids = torch.cat((input_ids, target_ids), dim=-1)
+        outputs = model(input_ids=ids)
+        print("in ids, most probable token after", tokenizer.decode(ids[0, input_ids.shape[-1]-1]), ":", tokenizer.decode(torch.argmax(outputs.logits[0, input_ids.shape[-1]-1, :], dim=-1)), "with probability", torch.max(F.softmax(outputs.logits[0, input_ids.shape[-1]-1, :], dim=-1)).item())
 
         if with_target:
             text_output, jailbroken = check_for_attack_success_noref_with_target(model, tokenizer, input, target, test_prefixes, max_new_tokens)
