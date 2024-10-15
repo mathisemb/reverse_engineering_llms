@@ -128,7 +128,7 @@ def get_interpretation(adv_embedding, interpretation_len, init_model, tokenizer)
     device = init_model.device
     
     ask1_txt = "What does "
-    ask2_txt = " means? It means "
+    ask2_txt = " mean? It means "
     """
     ask1_txt = "Translate \""
     ask2_txt = "\" to english. Sure! Here is the translation: "
