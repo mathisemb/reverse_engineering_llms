@@ -19,7 +19,7 @@ in the ```paper/gcg/llm-attacks``` folder.
 - The ```paper/gcg/llm-attacks/my_experiments``` folder which contains python scripts for some the experiments mentionned in my internship report.
   - The ```one_example``` folder contains the scripts to run autoprompt, gcg and our method on a single example. They need to be run from the ```paper/gcg/llm-attacks/my_experiments``` folder
     ```bash
-    python3 one_example/[autoprompt or gcg or our_mehtod].py
+    python3 one_example/[autoprompt or gcg or our_method].py
     ```
   - The ```attraction_test.py``` file aims to check if we can noise an input embedding such that the LLM cannot answer it corectly but can after optimizing the input with the loss attracting the embeddings toward the embedding matrix. You can run it like this:
     ```bash
