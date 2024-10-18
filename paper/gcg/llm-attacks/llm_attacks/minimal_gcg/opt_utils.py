@@ -175,14 +175,13 @@ def forward(*, model, input_ids, attention_mask, batch_size=512):
     
     return torch.cat(logits, dim=0)
 
-"""
 def target_loss(logits, ids, target_slice):
     crit = nn.CrossEntropyLoss(reduction='none')
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
     loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
     return loss.mean(dim=-1)
-"""
 
+"""
 def target_loss(model, tokenizer, logits, ids, target_slice):
     crit = nn.CrossEntropyLoss(reduction='none')
     loss_slice = slice(target_slice.start-1, target_slice.stop-1)
@@ -198,7 +197,7 @@ def target_loss(model, tokenizer, logits, ids, target_slice):
 
     loss = crit(logits[:,loss_slice,:].transpose(1,2), ids[:,target_slice])
     return loss.mean(dim=-1)
-
+"""
 
 def load_model_and_tokenizer(model_path, tokenizer_path=None, device='cuda:0', **kwargs):
     model = AutoModelForCausalLM.from_pretrained(
